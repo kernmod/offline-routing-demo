@@ -16,19 +16,22 @@ or inherited product history.
 
 ## Try the complete flow
 
-Current delivery status: the fixture, native engine, Android release build,
-airplane-mode device proof, and API are verified. The viewer and GitHub Release
-remain local until their external smoke tests pass.
+Current delivery status: `LIVE_VERIFIED`. The public fixture, native engine,
+Android release, airplane-mode route, Worker/D1 API, and browser viewer have all
+passed their local and external gates.
 
 | Experience | Link | Status |
 | --- | --- | --- |
-| Android APK | pending GitHub Release | local release verified |
-| Browser viewer | pending public URL | local WebGL E2E verified |
+| Android APK | [download v0.1.0](https://github.com/kernmod/offline-routing-demo/releases/download/v0.1.0/offline-routing-demo-cchp1.apk) | offline and live flow verified |
+| Browser viewer | [open the public viewer](https://kernmod.github.io/offline-routing-demo/) | live WebGL/PMTiles verified |
 | Segment API | [offline-routing-segments.yaktrak.workers.dev](https://offline-routing-segments.yaktrak.workers.dev/health) | live publish/read verified |
 
 Playwright reference captures are kept for the
 [desktop viewer](apps/viewer/e2e/viewer-desktop.spec.ts-snapshots/viewer-desktop-desktop-chromium-linux.png)
 and its [mobile layout](apps/viewer/e2e/viewer-mobile.spec.ts-snapshots/viewer-mobile-mobile-chromium-linux.png).
+The final external checks retain the [live viewer](docs/evidence/2026-08-31T20-01-00Z-live-viewer.png)
+and [Android publish/read](docs/evidence/2026-08-31T20-10-00Z-mobile-live.png)
+screens.
 
 The intended user journey is deliberately small:
 
@@ -130,7 +133,8 @@ Android additionally requires SDK 36, NDK 27.1, CMake, an x86_64 or arm64
 device, and `ANDROID_SERIAL`.
 
 ```bash
-./scripts/build-apk.sh
+EXPO_PUBLIC_SEGMENTS_API_URL=https://offline-routing-segments.yaktrak.workers.dev \
+  ./scripts/build-apk.sh
 
 # With airplane mode already enabled on the named target:
 ANDROID_SERIAL=localhost:5555 \
@@ -142,9 +146,12 @@ The build creates a demo keystore under the user's home directory and writes
 the APK outside the repository. No signing material is versioned. The device
 gate inspects final APK permissions, installs it, verifies native startup,
 exercises Android back handling, and runs a local route while airplane mode is
-on. The latest clean-clone build proof records the
-[device result](docs/evidence/2026-08-31T12-38-00Z-release-device.txt) and
-[airplane-mode screen](docs/evidence/2026-08-31T12-38-00Z-release-device.png).
+on. The released APK is 64,925,091 bytes with SHA-256
+`7e8693197adebbab079c50974bcba2d2d52e2d2446faabb6980bdb279373a156`.
+The final device proof records the
+[airplane-mode result](docs/evidence/2026-08-31T20-11-16Z-release-device.txt),
+[route screen](docs/evidence/2026-08-31T20-11-16Z-release-device.png), and
+[complete live delivery check](docs/evidence/2026-08-31T20-11-00Z-live-delivery.md).
 
 ### API and viewer development
 

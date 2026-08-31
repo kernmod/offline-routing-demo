@@ -174,3 +174,11 @@ test("the release-device gate executes Android startup, back handling, route, an
   assert.match(script, /OfflineRoutingMapReady/);
   assert.match(script, /OfflineRoutingRoute/);
 });
+
+test("release evidence records the APK digest without a builder filesystem path", () => {
+  const script = read("../../scripts/device/verify-release.sh");
+
+  assert.match(script, /apk_sha256="\$\(sha256sum "\$apk" \| awk '\{print \$1\}'\)"/);
+  assert.match(script, /echo "apk_sha256=\$apk_sha256"/);
+  assert.doesNotMatch(script, /^\s*sha256sum "\$apk"$/m);
+});

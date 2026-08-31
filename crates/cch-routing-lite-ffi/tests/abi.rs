@@ -4,6 +4,7 @@ use cch_routing_lite_ffi::{
     routing_router_route, RoutingBuffer, RoutingCoordinate, ROUTING_ERR_BAD_PACK,
     ROUTING_ERR_INVALID_ARGUMENT, ROUTING_ERR_ROUTE, ROUTING_OK,
 };
+use std::sync::{Arc, Barrier};
 
 fn pack() -> Vec<u8> {
     BuildConfig {
@@ -34,6 +35,34 @@ fn zero_length_pack_is_explicitly_rejected_before_pointer_conversion() {
         cch_routing_lite_ffi::routing_last_error(),
         ROUTING_ERR_BAD_PACK
     );
+}
+
+#[test]
+fn last_load_error_is_isolated_per_calling_thread() {
+    let bad_load_finished = Arc::new(Barrier::new(2));
+    let good_load_finished = Arc::new(Barrier::new(2));
+
+    let bad_barrier = Arc::clone(&bad_load_finished);
+    let good_barrier = Arc::clone(&good_load_finished);
+    let bad_thread = std::thread::spawn(move || {
+        assert!(unsafe { routing_router_load(std::ptr::null(), 0) }.is_null());
+        bad_barrier.wait();
+        good_barrier.wait();
+        assert_eq!(
+            cch_routing_lite_ffi::routing_last_error(),
+            ROUTING_ERR_BAD_PACK
+        );
+    });
+
+    bad_load_finished.wait();
+    let valid_pack = pack();
+    let router = unsafe { routing_router_load(valid_pack.as_ptr(), valid_pack.len()) };
+    assert!(!router.is_null());
+    assert_eq!(cch_routing_lite_ffi::routing_last_error(), ROUTING_OK);
+    good_load_finished.wait();
+
+    bad_thread.join().unwrap();
+    routing_router_free(router);
 }
 
 #[test]

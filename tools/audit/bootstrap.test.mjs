@@ -33,6 +33,12 @@ test("README describes the recruiter-facing problem and commands", () => {
   assert.match(readme, /^## What this demonstrates/m);
   assert.match(readme, /^## Workspace/m);
   assert.match(readme, /^## Reproduce it/m);
+  assert.match(readme, /https:\/\/kernmod\.github\.io\/offline-routing-demo\//);
+  assert.match(readme, /https:\/\/offline-routing-segments\.yaktrak\.workers\.dev/);
+  assert.match(readme, /releases\/download\/v0\.1\.0\/offline-routing-demo-cchp1\.apk/);
+  assert.doesNotMatch(readme, /pending (?:GitHub Release|public URL|Worker URL)/i);
+  assert.equal(existsSync(resolve(root, "docs/evidence/2026-08-31T20-01-00Z-live-viewer.png")), true);
+  assert.equal(existsSync(resolve(root, "docs/evidence/2026-08-31T20-10-00Z-mobile-live.png")), true);
 });
 
 test("testing guide documents TDD and coverage thresholds", () => {
@@ -56,6 +62,17 @@ test("CI executes public audit, tests, coverage, and secret scanning", () => {
   assert.match(ci, /cargo install cargo-llvm-cov --locked --version 0\.9\.0/);
   assert.match(ci, /gitleaks/i);
   assert.match(ci, /clippy/);
+});
+
+test("CI fetches complete history for the gitleaks push range", () => {
+  const ci = read(".github/workflows/ci.yml");
+  const checkoutStart = ci.indexOf("- uses: actions/checkout@v4");
+  const checkoutEnd = ci.indexOf("\n      - ", checkoutStart + 1);
+  const checkoutStep = ci.slice(checkoutStart, checkoutEnd);
+
+  assert.notEqual(checkoutStart, -1);
+  assert.match(checkoutStep, /fetch-depth:\s*0/);
+  assert.ok(checkoutStart < ci.indexOf("gitleaks/gitleaks-action@v2"));
 });
 
 test("coverage is mandatory and CI preserves both JS and Rust LCOV evidence", () => {
@@ -181,11 +198,14 @@ test("live API verification is explicit and stays outside the offline local gate
   assert.doesNotMatch(localGate, /verify-live-api/);
 });
 
-test("architecture and public boundary stay honest about delivery status", () => {
+test("architecture and public boundary stay honest about live delivery status", () => {
   const architecture = read("docs/architecture.md");
   const boundary = read("docs/security/public-boundary.md");
-  assert.match(architecture, /locally verified/i);
-  assert.match(architecture, /public deployment evidence remains open/i);
+  const readiness = read("docs/security/public-readiness.md");
+  assert.match(architecture, /LIVE_VERIFIED/);
+  assert.doesNotMatch(architecture, /deployment evidence remains open/i);
+  assert.match(readiness, /LIVE_VERIFIED/);
+  assert.doesNotMatch(readiness, /Remaining blockers before publication/);
   assert.match(architecture, /Nitro bridge.*Rust CCH/i);
   assert.match(architecture, /PMTiles/i);
   assert.match(boundary, /clean history/i);

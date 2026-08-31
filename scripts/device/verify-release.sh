@@ -10,6 +10,7 @@ package="dev.offlinerouting.demo"
 activity="$package/.MainActivity"
 
 test -f "$apk"
+apk_sha256="$(sha256sum "$apk" | awk '{print $1}')"
 test -x "$aapt_bin"
 adb -s "$serial" get-state >/dev/null
 adb -s "$serial" shell settings get global airplane_mode_on | grep -qx '1' || {
@@ -71,7 +72,7 @@ mkdir -p "$output_dir"
   echo "startup=pass"
   echo "back=pass"
   echo "route=local_native"
-  sha256sum "$apk"
+  echo "apk_sha256=$apk_sha256"
 } > "$output_dir/$timestamp-release-device.txt"
 adb -s "$serial" exec-out screencap -p > "$output_dir/$timestamp-release-device.png"
 echo "Release device gate passed: $output_dir/$timestamp-release-device.txt"

@@ -1,6 +1,6 @@
 # Public Readiness
 
-Status on 2026-08-31: `LOCAL_READY`, not `LIVE_VERIFIED`.
+Status on 2026-08-31: `LIVE_VERIFIED`.
 
 ## Local evidence closed
 
@@ -8,8 +8,8 @@ Status on 2026-08-31: `LOCAL_READY`, not `LIVE_VERIFIED`.
   tests, coverage collection, generated-output cleanup, and the public audit.
 - `make audit-public` is green. The structure, license, and denylist checks pass
   on the clean-history working tree.
-- gitleaks `v8.28.0` reports no leak on the publication file set; the scan is
-  repeated against reachable Git history after the final root commit is formed.
+- gitleaks `v8.28.0` reports no leak on the publication file set or reachable
+  public Git history; the scan is repeated before each publication commit.
 - `docs/evidence/2026-08-31-redroid14-airplane.md` records the device-local
   airplane-mode route proof and links the underlying screenshot, UI dump, logcat,
   and process-scoped `strace -e connect` capture.
@@ -33,14 +33,14 @@ Status on 2026-08-31: `LOCAL_READY`, not `LIVE_VERIFIED`.
   removes repo-local `.cxx`, demo keystore, sourcemap, dex, and Rust JNI
   transients while preserving the signed APK outside the repository.
 
-## Remaining blockers before publication
+## Live delivery evidence
 
-- Cloudflare Wrangler is installed but not authenticated, so no live Worker or
-  viewer deployment URL exists yet.
-- No public GitHub remote or release exists yet, so the APK and URLs cannot be
-  verified from outside the local machine.
-- The post-publication clean-clone proof still has to be rerun against the final
-  public remote state.
-
-Until those three items are closed, SC3, SC4, and the publication half of SC8
-remain open by design.
+- The Worker/D1 API passed external health, publish, and bbox-read checks at its
+  public HTTPS origin.
+- GitHub Pages serves the viewer and embedded PMTiles with HTTPS and byte ranges;
+  a headless external browser rendered the WebGL canvas with no failed request.
+- The final APK embeds only the public API origin. A fresh Android 14 emulator
+  published and reloaded a segment online, then passed the release gate again in
+  airplane mode with a native local route.
+- The public URLs, release hash, device logs, and screenshots are consolidated in
+  `docs/evidence/2026-08-31T20-11-00Z-live-delivery.md`.

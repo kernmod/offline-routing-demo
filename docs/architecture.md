@@ -1,8 +1,10 @@
 # Architecture
 
-Status on 2026-08-31: locally verified for the public fixture, routing core,
-API contract, browser viewer, Android release build, airplane-mode route, and
-named-device benchmark. Public deployment evidence remains open.
+Status on 2026-08-31: `LIVE_VERIFIED` for the API, public browser viewer, Android
+delivery, airplane-mode route, and online publish/read loop. The fixture,
+routing core, and named-device benchmark are separately reproducible local
+evidence; the benchmark is not presented as a live service. Evidence is linked
+from the root README and `docs/evidence/`.
 
 ## System shape
 

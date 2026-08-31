@@ -4,6 +4,7 @@
 //! repeated frees and stale handles are harmless no-ops. Returned bytes belong
 //! to the caller until passed to `routing_buffer_free`.
 
+use std::cell::Cell;
 use std::collections::HashMap;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::sync::{
@@ -38,7 +39,10 @@ static BUFFERS: LazyLock<Mutex<HashMap<usize, BufferEntry>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 static NEXT_HANDLE: AtomicUsize = AtomicUsize::new(1);
 static NEXT_BUFFER_TOKEN: AtomicUsize = AtomicUsize::new(1);
-static LAST_ERROR: LazyLock<Mutex<i32>> = LazyLock::new(|| Mutex::new(ROUTING_OK));
+
+thread_local! {
+    static LAST_ERROR: Cell<i32> = const { Cell::new(ROUTING_OK) };
+}
 
 /// Opaque, registry-backed C router handle.
 #[repr(C)]
@@ -78,11 +82,11 @@ impl Default for RoutingBuffer {
     }
 }
 
-/// Returns the status from the last load attempt on this process.
+/// Returns the status from the last load attempt on the calling thread.
 #[must_use]
 #[no_mangle]
 pub extern "C" fn routing_last_error() -> i32 {
-    *lock_or_recover(&LAST_ERROR)
+    LAST_ERROR.with(Cell::get)
 }
 
 /// Loads a router from immutable pack bytes.
@@ -337,7 +341,7 @@ fn catch_void(callback: impl FnOnce()) {
 }
 
 fn set_last_error(code: i32) {
-    *lock_or_recover(&LAST_ERROR) = code;
+    LAST_ERROR.set(code);
 }
 
 fn next_handle() -> usize {
