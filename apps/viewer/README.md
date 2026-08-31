@@ -71,6 +71,17 @@ same prefix. `pnpm --filter @offline-routing/viewer test:e2e:base` verifies this
 deployment form against `/viewer/style.json`, `/viewer/map.pmtiles`, and the
 fixture glyph path.
 
+A new GitHub repository needs one one-time repository-administrator step before
+the workflow can deploy Pages:
+
+```bash
+gh api --method POST repos/OWNER/REPO/pages -f build_type=workflow
+```
+
+GitHub does not allow the workflow's own `GITHUB_TOKEN` to create the Pages site.
+After this administrative bootstrap, the pinned workflow deploys every `main`
+update using only `pages: write` and `id-token: write`; no PAT is stored in Actions.
+
 ## Accessibility and attribution
 
 The map remains usable by keyboard users through the segment list: each row is
