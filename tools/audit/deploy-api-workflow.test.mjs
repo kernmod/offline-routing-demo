@@ -26,6 +26,7 @@ test("API deploy only runs for relevant main changes or manual dispatch", () => 
     "pnpm-lock.yaml",
     "pnpm-workspace.yaml",
     ".node-version",
+    "tools/deploy/**",
     ".github/workflows/deploy-api.yml"
   ]);
 });
@@ -35,42 +36,51 @@ test("API deploy uses reproducible tools and least GitHub privilege", () => {
 
   assert.match(source, /^permissions:\s*\n\s+contents: read$/m);
   assert.doesNotMatch(source, /\b(?:actions|checks|deployments|id-token|issues|packages|pages|pull-requests|statuses):\s*write\b/);
-  assert.match(source, /pnpm\/action-setup@v4[\s\S]*version: 10\.24\.0/);
-  assert.match(source, /actions\/setup-node@v4[\s\S]*node-version: 22\.23\.2/);
+  assert.match(source, /actions\/checkout@11d5960a326750d5838078e36cf38b85af677262/);
+  assert.match(source, /pnpm\/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa[\s\S]*version: 10\.24\.0/);
+  assert.match(source, /actions\/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020[\s\S]*node-version: 22\.23\.2/);
   assert.match(source, /pnpm install --frozen-lockfile/);
   assert.doesNotMatch(source, /\bnpx\b|cloudflare\/wrangler-action|wrangler@(?:latest|\^|~)/);
 });
 
-test("API deploy uses only the two Cloudflare credentials", () => {
+test("API deploy scopes the two Cloudflare credentials and bootstrap salt", () => {
   const source = workflow();
   const referencedSecrets = [...source.matchAll(/secrets\.([A-Z0-9_]+)/g)].map((match) => match[1]);
   const jobPreamble = source.match(/jobs:\s*\n[\s\S]*?steps:/)?.[0];
 
   assert.deepEqual([...new Set(referencedSecrets)].sort(), [
     "CLOUDFLARE_ACCOUNT_ID",
-    "CLOUDFLARE_API_TOKEN"
+    "CLOUDFLARE_API_TOKEN",
+    "RATE_LIMIT_SALT"
   ]);
   assert.doesNotMatch(jobPreamble, /\benv:/, "credentials must be scoped to Cloudflare run steps");
-  assert.equal(referencedSecrets.filter((name) => name === "CLOUDFLARE_ACCOUNT_ID").length, 3);
-  assert.equal(referencedSecrets.filter((name) => name === "CLOUDFLARE_API_TOKEN").length, 3);
-  assert.doesNotMatch(source, /RATE_LIMIT_SALT:\s*\$\{\{/);
+  assert.equal(referencedSecrets.filter((name) => name === "CLOUDFLARE_ACCOUNT_ID").length, 2);
+  assert.equal(referencedSecrets.filter((name) => name === "CLOUDFLARE_API_TOKEN").length, 2);
+  assert.equal(referencedSecrets.filter((name) => name === "RATE_LIMIT_SALT").length, 1);
   assert.doesNotMatch(source, /wrangler secret put/);
+  assert.doesNotMatch(source, /wrangler secret list/);
+  assert.doesNotMatch(source, /set -x/);
 });
 
-test("API deploy validates prerequisites, migrates remotely, then deploys", () => {
+test("API deploy validates production inputs, migrates, then bootstraps atomically", () => {
   const source = workflow();
-  const preflight = source.indexOf("wrangler secret list --format json");
+  const preflight = source.indexOf("tools/deploy/validate-api-config.mjs");
+  const secretPreparation = source.indexOf("Prepare deployment secret");
   const migration = source.indexOf("wrangler d1 migrations apply DB --remote");
   const deploy = source.indexOf("wrangler deploy");
 
-  assert.match(source, /00000000-0000-0000-0000-000000000000/);
+  assert.match(source, /VIEWER_ORIGIN:\s*\$\{\{ vars\.VIEWER_ORIGIN \}\}/);
   assert.match(source, /RATE_LIMIT_SALT/);
-  assert.ok(preflight >= 0, "the workflow must verify the pre-provisioned Worker secret");
-  assert.ok(preflight < migration, "secret preflight must run before migrations");
+  assert.ok(preflight >= 0, "the workflow must validate D1 and the production viewer origin");
+  assert.ok(preflight < secretPreparation, "configuration preflight must precede secret preparation");
+  assert.ok(secretPreparation < migration, "the salt must be validated before remote migrations");
   assert.ok(migration < deploy, "remote migrations must finish before Worker deployment");
-  assert.match(source, /working-directory: apps\/api/);
+  assert.match(source, /node tools\/deploy\/validate-api-config\.mjs apps\/api\/wrangler\.toml/);
   assert.match(source, /pnpm exec wrangler d1 migrations apply DB --remote --yes/);
-  assert.match(source, /pnpm exec wrangler deploy/);
+  assert.match(source, /worker-secrets\.json/);
+  assert.match(source, /writeFileSync\(path, JSON\.stringify\(\{ RATE_LIMIT_SALT: salt \}\), \{ mode: 0o600 \}\)/);
+  assert.match(source, /pnpm exec wrangler deploy --var "ALLOWED_ORIGINS:\$VIEWER_ORIGIN" --secrets-file "\$RUNNER_TEMP\/worker-secrets\.json"/);
+  assert.match(source, /name: Remove deployment secret[\s\S]*if: always\(\)[\s\S]*rmSync/);
 });
 
 test("API deployments are serialized without cancelling an active deployment", () => {

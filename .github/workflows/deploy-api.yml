@@ -10,6 +10,7 @@ on:
       - "pnpm-lock.yaml"
       - "pnpm-workspace.yaml"
       - ".node-version"
+      - "tools/deploy/**"
       - ".github/workflows/deploy-api.yml"
   workflow_dispatch:
 
@@ -25,40 +26,33 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
         with:
           version: 10.24.0
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22.23.2
           cache: pnpm
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       - name: Validate deploy configuration
-        working-directory: apps/api
-        run: |
-          node --input-type=module <<'NODE'
-          import { readFileSync } from "node:fs";
-          const config = readFileSync("wrangler.toml", "utf8");
-          const placeholder = "00000000-0000-0000-0000-000000000000";
-          if (config.includes(placeholder)) {
-            throw new Error("Replace the placeholder D1 database_id before deploying");
-          }
-          NODE
-      - name: Verify pre-provisioned Worker secrets
-        working-directory: apps/api
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          VIEWER_ORIGIN: ${{ vars.VIEWER_ORIGIN }}
+        run: node tools/deploy/validate-api-config.mjs apps/api/wrangler.toml
+      - name: Prepare deployment secret
+        env:
+          RATE_LIMIT_SALT: ${{ secrets.RATE_LIMIT_SALT }}
         run: |
-          pnpm exec wrangler secret list --format json > "$RUNNER_TEMP/worker-secrets.json"
+          umask 077
           node --input-type=module <<'NODE'
-          import { readFileSync } from "node:fs";
-          const secrets = JSON.parse(readFileSync(process.env.RUNNER_TEMP + "/worker-secrets.json", "utf8"));
-          if (!Array.isArray(secrets) || !secrets.some(({ name }) => name === "RATE_LIMIT_SALT")) {
-            throw new Error("RATE_LIMIT_SALT must already be provisioned as a Worker secret");
+          import { writeFileSync } from "node:fs";
+          const salt = process.env.RATE_LIMIT_SALT;
+          if (typeof salt !== "string" || salt.length < 32) {
+            throw new Error("RATE_LIMIT_SALT must be a GitHub secret of at least 32 characters");
           }
+          const path = process.env.RUNNER_TEMP + "/worker-secrets.json";
+          writeFileSync(path, JSON.stringify({ RATE_LIMIT_SALT: salt }), { mode: 0o600 });
           NODE
       - name: Apply remote D1 migrations
         working-directory: apps/api
@@ -71,4 +65,9 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: pnpm exec wrangler deploy
+          VIEWER_ORIGIN: ${{ vars.VIEWER_ORIGIN }}
+        run: pnpm exec wrangler deploy --var "ALLOWED_ORIGINS:$VIEWER_ORIGIN" --secrets-file "$RUNNER_TEMP/worker-secrets.json"
+      - name: Remove deployment secret
+        if: always()
+        run: |
+          node --input-type=module -e 'import { rmSync } from "node:fs"; rmSync(process.env.RUNNER_TEMP + "/worker-secrets.json", { force: true });'

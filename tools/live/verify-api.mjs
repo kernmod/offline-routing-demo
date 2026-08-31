@@ -11,11 +11,12 @@ export async function runLiveApiCli({
   stdout = process.stdout,
   stderr = process.stderr,
   fetchImpl = globalThis.fetch,
+  lookupFactory,
   uuid = randomUUID
 } = {}) {
   try {
     const apiUrl = resolveLiveApiUrl(argv, env);
-    const result = await verifyLiveApi({ apiUrl, fetchImpl, randomUUID: uuid });
+    const result = await verifyLiveApi({ apiUrl, fetchImpl, lookupFactory, randomUUID: uuid });
     stdout.write(
       `LIVE_API_OK health=${result.statuses.health} publish=${result.statuses.publish} nearby=${result.statuses.nearby}\n`
     );

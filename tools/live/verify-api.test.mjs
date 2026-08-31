@@ -5,6 +5,7 @@ import {
   LiveApiVerificationError,
   normalizeLiveApiUrl,
   resolveLiveApiUrl,
+  systemLookupFactory,
   verifyLiveApi
 } from "./verify-api-lib.mjs";
 import { runLiveApiCli } from "./verify-api.mjs";
@@ -12,6 +13,15 @@ import { runLiveApiCli } from "./verify-api.mjs";
 const API_URL = "https://segments-api.example.workers.dev";
 const IDEMPOTENCY_KEY = "018f9be5-4370-4a48-9f64-571f55555555";
 const SEGMENT_ID = "8de15dc3-80d3-4c53-89e2-50b592076cf7";
+function resolverFactory(lookup, cancel = () => {}) {
+  return () => ({ lookup, cancel });
+}
+
+const PUBLIC_LOOKUP_FACTORY = resolverFactory(async () => [{ address: "1.1.1.1", family: 4 }]);
+
+function verify(options) {
+  return verifyLiveApi({ lookupFactory: PUBLIC_LOOKUP_FACTORY, ...options });
+}
 
 const record = {
   id: SEGMENT_ID,
@@ -71,16 +81,28 @@ test("live URL policy accepts only an uncredentialed public HTTPS origin", () =>
     urlWithCredentials("https://localhost", "localhost.example.com"),
     "https://127.0.0.1",
     "https://10.0.0.1",
+    "https://100.64.0.1",
     "https://169.254.10.1",
     "https://172.16.0.1",
+    "https://192.0.2.1",
     "https://192.168.0.1",
+    "https://198.18.0.1",
+    "https://198.51.100.1",
+    "https://203.0.113.1",
     "https://224.0.0.1",
     "https://[::1]",
     "https://[fc00::1]",
     "https://[fe80::1]",
+    "https://[2001:db8::1]",
+    "https://[::ffff:192.168.0.1]",
     "https://printer.local",
     "https://singlelabel",
     "https://api.example:8443",
+    "https://api.example",
+    "https://fc.example.com",
+    "https://1.1.1.1",
+    "https://[2606:4700:4700::1111]",
+    "https://worker.workers.dev.evil.example",
     "https://api.example/path",
     "https://api.example?token=secret",
     urlWithCredentials("https://api.example", "fixture-user", "fixture-password")
@@ -103,7 +125,7 @@ test("URL resolution requires an explicit CLI flag or environment value", () => 
 
 test("verifier completes health, publish, and bbox read with bounded honest requests", async () => {
   const requests = [];
-  const result = await verifyLiveApi({
+  const result = await verify({
     apiUrl: API_URL,
     fetchImpl: successfulFetch(requests),
     randomUUID: () => IDEMPOTENCY_KEY
@@ -146,7 +168,7 @@ test("verifier accepts idempotent publish replay status 200", async () => {
     }
     return response;
   };
-  const result = await verifyLiveApi({ apiUrl: API_URL, fetchImpl, randomUUID: () => IDEMPOTENCY_KEY });
+  const result = await verify({ apiUrl: API_URL, fetchImpl, randomUUID: () => IDEMPOTENCY_KEY });
   assert.equal(result.statuses.publish, 200);
 });
 
@@ -159,7 +181,7 @@ test("verifier rejects dishonest content and cache headers", async () => {
   ]) {
     const fetchImpl = async () => jsonResponse({ ok: true }, { headers });
     await assert.rejects(
-      verifyLiveApi({ apiUrl: API_URL, fetchImpl, randomUUID: () => IDEMPOTENCY_KEY }),
+      verify({ apiUrl: API_URL, fetchImpl, randomUUID: () => IDEMPOTENCY_KEY }),
       LiveApiVerificationError
     );
   }
@@ -175,7 +197,7 @@ test("verifier validates health and segment response contracts", async () => {
   for (const payload of invalidPayloads) {
     const fetchImpl = async () => jsonResponse(payload);
     await assert.rejects(
-      verifyLiveApi({ apiUrl: API_URL, fetchImpl, randomUUID: () => IDEMPOTENCY_KEY }),
+      verify({ apiUrl: API_URL, fetchImpl, randomUUID: () => IDEMPOTENCY_KEY }),
       /health response contract/
     );
   }
@@ -187,7 +209,7 @@ test("verifier validates health and segment response contracts", async () => {
     return jsonResponse({ segments: [record] });
   };
   await assert.rejects(
-    verifyLiveApi({ apiUrl: API_URL, fetchImpl, randomUUID: () => IDEMPOTENCY_KEY }),
+    verify({ apiUrl: API_URL, fetchImpl, randomUUID: () => IDEMPOTENCY_KEY }),
     /publish response contract/
   );
 });
@@ -200,14 +222,110 @@ test("verifier requires the exact published record in the bbox read", async () =
     return jsonResponse({ segments: [{ ...record, encodedGeometry: "tampered" }] });
   };
   await assert.rejects(
-    verifyLiveApi({ apiUrl: API_URL, fetchImpl, randomUUID: () => IDEMPOTENCY_KEY }),
+    verify({ apiUrl: API_URL, fetchImpl, randomUUID: () => IDEMPOTENCY_KEY }),
     /published segment was not returned unchanged/
+  );
+});
+
+test("verifier resolves hostnames and refuses any non-public address before fetch", async () => {
+  let fetched = false;
+  await assert.rejects(
+    verify({
+      apiUrl: API_URL,
+      fetchImpl: async () => { fetched = true; },
+      lookupFactory: resolverFactory(async () => [
+        { address: "1.1.1.1", family: 4 },
+        { address: "192.168.1.10", family: 4 }
+      ]),
+      randomUUID: () => IDEMPOTENCY_KEY
+    }),
+    /hostname resolves to a non-public address/
+  );
+  assert.equal(fetched, false);
+
+  await assert.rejects(
+    verify({
+      apiUrl: API_URL,
+      fetchImpl: async () => { fetched = true; },
+      lookupFactory: resolverFactory(async () => { throw new Error("resolver details"); }),
+      randomUUID: () => IDEMPOTENCY_KEY
+    }),
+    /hostname could not be resolved/
+  );
+  assert.equal(fetched, false);
+
+  await assert.rejects(
+    verify({
+      apiUrl: API_URL,
+      fetchImpl: async () => { fetched = true; },
+      lookupFactory: resolverFactory(async () => []),
+      randomUUID: () => IDEMPOTENCY_KEY
+    }),
+    /hostname could not be resolved/
+  );
+  assert.equal(fetched, false);
+
+  let resolverCancelled = false;
+  const resolverHandle = setInterval(() => {}, 1_000);
+  const startedAt = Date.now();
+  await assert.rejects(
+    verify({
+      apiUrl: API_URL,
+      fetchImpl: async () => { fetched = true; },
+      lookupFactory: resolverFactory(
+        async () => new Promise(() => {}),
+        () => {
+          resolverCancelled = true;
+          clearInterval(resolverHandle);
+        }
+      ),
+      randomUUID: () => IDEMPOTENCY_KEY,
+      timeoutMs: 10
+    }),
+    /DNS lookup timed out after 10ms/
+  );
+  assert.ok(Date.now() - startedAt < 500, "DNS timeout must bound the verifier");
+  assert.equal(resolverCancelled, true);
+  assert.equal(fetched, false);
+});
+
+test("system DNS session merges successful families and exposes real cancellation", async () => {
+  let cancelled = false;
+  class FakeResolver {
+    async resolve4() { return ["1.1.1.1"]; }
+    async resolve6() { throw new Error("no IPv6"); }
+    cancel() { cancelled = true; }
+  }
+  const session = systemLookupFactory(FakeResolver);
+  assert.deepEqual(await session.lookup("worker.example.workers.dev"), [
+    { address: "1.1.1.1", family: 4 }
+  ]);
+  session.cancel();
+  assert.equal(cancelled, true);
+
+  class Ipv6Resolver {
+    async resolve4() { throw new Error("no IPv4"); }
+    async resolve6() { return ["2606:4700:4700::1111"]; }
+    cancel() {}
+  }
+  assert.deepEqual(await systemLookupFactory(Ipv6Resolver).lookup("worker.example.workers.dev"), [
+    { address: "2606:4700:4700::1111", family: 6 }
+  ]);
+
+  class EmptyResolver {
+    async resolve4() { throw new Error("no IPv4"); }
+    async resolve6() { throw new Error("no IPv6"); }
+    cancel() {}
+  }
+  await assert.rejects(
+    systemLookupFactory(EmptyResolver).lookup("worker.example.workers.dev"),
+    /no address records/
   );
 });
 
 test("verifier enforces status, timeout, and response-size boundaries", async () => {
   await assert.rejects(
-    verifyLiveApi({
+    verify({
       apiUrl: API_URL,
       fetchImpl: async () => jsonResponse({ error: "internal_error" }, { status: 503 }),
       randomUUID: () => IDEMPOTENCY_KEY
@@ -216,7 +334,7 @@ test("verifier enforces status, timeout, and response-size boundaries", async ()
   );
 
   await assert.rejects(
-    verifyLiveApi({
+    verify({
       apiUrl: API_URL,
       fetchImpl: async () => jsonResponse({ ok: true }, { headers: { "content-length": "100000" } }),
       maxResponseBytes: 1024,
@@ -226,7 +344,7 @@ test("verifier enforces status, timeout, and response-size boundaries", async ()
   );
 
   await assert.rejects(
-    verifyLiveApi({
+    verify({
       apiUrl: API_URL,
       fetchImpl: async () => new Response("x".repeat(1025), {
         headers: { "cache-control": "no-store", "content-type": "application/json" }
@@ -241,7 +359,7 @@ test("verifier enforces status, timeout, and response-size boundaries", async ()
     signal.addEventListener("abort", () => reject(signal.reason), { once: true });
   });
   await assert.rejects(
-    verifyLiveApi({
+    verify({
       apiUrl: API_URL,
       fetchImpl: hangingFetch,
       timeoutMs: 10,
@@ -276,25 +394,29 @@ test("verifier rejects malformed bodies, transport failures, and unsafe runtime 
   ];
   for (const { fetchImpl, expected } of cases) {
     await assert.rejects(
-      verifyLiveApi({ apiUrl: API_URL, fetchImpl, randomUUID: () => IDEMPOTENCY_KEY }),
+      verify({ apiUrl: API_URL, fetchImpl, randomUUID: () => IDEMPOTENCY_KEY }),
       expected
     );
   }
 
   await assert.rejects(
-    verifyLiveApi({ apiUrl: API_URL, fetchImpl: null, randomUUID: () => IDEMPOTENCY_KEY }),
+    verify({ apiUrl: API_URL, fetchImpl: null, randomUUID: () => IDEMPOTENCY_KEY }),
     /Fetch API is unavailable/
   );
   await assert.rejects(
-    verifyLiveApi({ apiUrl: API_URL, fetchImpl: async () => jsonResponse({ ok: true }), randomUUID: null }),
+    verify({ apiUrl: API_URL, fetchImpl: async () => jsonResponse({ ok: true }), lookupFactory: null }),
+    /DNS lookup is unavailable/
+  );
+  await assert.rejects(
+    verify({ apiUrl: API_URL, fetchImpl: async () => jsonResponse({ ok: true }), randomUUID: null }),
     /UUID generation is unavailable/
   );
   await assert.rejects(
-    verifyLiveApi({ apiUrl: API_URL, fetchImpl: async () => jsonResponse({ ok: true }), randomUUID: () => "bad" }),
+    verify({ apiUrl: API_URL, fetchImpl: async () => jsonResponse({ ok: true }), randomUUID: () => "bad" }),
     /invalid UUIDv4/
   );
   await assert.rejects(
-    verifyLiveApi({
+    verify({
       apiUrl: API_URL,
       fetchImpl: async () => jsonResponse({ ok: true }),
       randomUUID: () => IDEMPOTENCY_KEY,
@@ -312,7 +434,7 @@ test("verifier rejects a malformed nearby envelope", async () => {
     return jsonResponse({ segments: "not-an-array" });
   };
   await assert.rejects(
-    verifyLiveApi({ apiUrl: API_URL, fetchImpl, randomUUID: () => IDEMPOTENCY_KEY }),
+    verify({ apiUrl: API_URL, fetchImpl, randomUUID: () => IDEMPOTENCY_KEY }),
     /nearby response contract/
   );
 });
@@ -321,7 +443,7 @@ test("errors never echo URL credentials, query secrets, idempotency keys, or res
   const secrets = ["username", "password", "query-secret", IDEMPOTENCY_KEY, "body-secret"];
   let message = "";
   try {
-    await verifyLiveApi({
+    await verify({
       apiUrl: urlWithCredentials("https://api.example", "username", "password", "query-secret"),
       fetchImpl: async () => jsonResponse({ error: "body-secret" }, { status: 500 }),
       randomUUID: () => IDEMPOTENCY_KEY
@@ -342,6 +464,7 @@ test("CLI reports only public status evidence and never request material", async
     stdout: { write: (value) => { stdout += value; } },
     stderr: { write: (value) => { stderr += value; } },
     fetchImpl: successfulFetch([]),
+    lookupFactory: PUBLIC_LOOKUP_FACTORY,
     uuid: () => IDEMPOTENCY_KEY
   });
   assert.equal(exitCode, 0);
@@ -356,6 +479,7 @@ test("CLI failure output is generic and credential-free", async () => {
   const exitCode = await runLiveApiCli({
     argv: ["--url", urlWithCredentials("https://api.example", "user", "password", "secret")],
     env: {},
+    lookupFactory: PUBLIC_LOOKUP_FACTORY,
     stdout: { write: (value) => { stdout += value; } },
     stderr: { write: (value) => { stderr += value; } }
   });

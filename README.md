@@ -161,18 +161,23 @@ The viewer's API origin is fixed by `VITE_API_BASE_URL` at build time. A public
 URL query parameter cannot redirect browser requests to another origin.
 
 Production deployment is intentionally explicit. The API workflow refuses the
-placeholder D1 identifier, applies versioned migrations non-interactively, checks
-that `RATE_LIMIT_SALT` already exists as a Worker secret, and only then deploys.
-GitHub Pages builds the viewer with the repository variable `SEGMENTS_API_URL`.
+placeholder D1 identifier and any non-public `VIEWER_ORIGIN`, validates and writes
+`RATE_LIMIT_SALT` to a mode-0600 ephemeral file before any remote mutation, applies
+versioned migrations non-interactively, then creates or updates the Worker with
+that secret in the same deploy command. GitHub receives three
+secrets (`CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `RATE_LIMIT_SALT`);
+none enters Git or command output. Pages builds the viewer with the repository
+variable `SEGMENTS_API_URL`.
 After deployment, the state-changing contract smoke test is:
 
 ```bash
 pnpm verify:live-api -- --url https://<worker-origin>
 ```
 
-It accepts only a public HTTPS origin, publishes one bounded Sydney segment, and
-requires the same record to be returned by the bbox query. It prints statuses,
-never request bodies, credentials, URLs, or idempotency keys.
+It accepts only the public HTTPS `*.workers.dev` origin produced by this deployment,
+bounds DNS resolution and rejects non-public answers, publishes one bounded Sydney
+segment, and requires the same record to be returned by the bbox query. It prints
+statuses, never request bodies, credentials, URLs, or idempotency keys.
 
 ## Performance evidence
 

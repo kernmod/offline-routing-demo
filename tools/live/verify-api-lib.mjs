@@ -1,3 +1,5 @@
+import { Resolver } from "node:dns/promises";
+import { isIP } from "node:net";
 import { isDeepStrictEqual } from "node:util";
 
 const DEFAULT_TIMEOUT_MS = 8_000;
@@ -41,38 +43,124 @@ function hasExactKeys(value, expected) {
   return keys.length === expected.length && keys.every((key, index) => key === expected[index]);
 }
 
-function isPrivateIpv4(hostname) {
+function isPublicIpv4(hostname) {
   const parts = hostname.split(".");
   if (parts.length !== 4 || parts.some((part) => !/^\d{1,3}$/.test(part))) return false;
   const octets = parts.map(Number);
-  if (octets.some((octet) => octet > 255)) return true;
-  const [a, b] = octets;
-  return (
-    a === 0 ||
-    a === 10 ||
-    a === 127 ||
+  if (octets.some((octet) => octet > 255)) return false;
+  const [a, b, c] = octets;
+  return !(
+    a === 0 || a === 10 || a === 127 || a >= 224 ||
+    (a === 100 && b >= 64 && b <= 127) ||
     (a === 169 && b === 254) ||
     (a === 172 && b >= 16 && b <= 31) ||
+    (a === 192 && b === 0 && c === 0) ||
+    (a === 192 && b === 0 && c === 2) ||
     (a === 192 && b === 168) ||
-    a >= 224
+    (a === 198 && (b === 18 || b === 19)) ||
+    (a === 198 && b === 51 && c === 100) ||
+    (a === 203 && b === 0 && c === 113)
   );
+}
+
+function ipv6Words(address) {
+  const halves = address.toLowerCase().split("::");
+  if (halves.length > 2) return null;
+  const left = halves[0] ? halves[0].split(":") : [];
+  const right = halves.length === 2 && halves[1] ? halves[1].split(":") : [];
+  const missing = 8 - left.length - right.length;
+  if ((halves.length === 1 && missing !== 0) || missing < 0) return null;
+  const words = [...left, ...Array(missing).fill("0"), ...right];
+  if (words.length !== 8 || words.some((word) => !/^[0-9a-f]{1,4}$/.test(word))) return null;
+  return words.map((word) => Number.parseInt(word, 16));
+}
+
+function isPublicIpv6(address) {
+  const words = ipv6Words(address);
+  if (!words) return false;
+  const [first, second] = words;
+  if ((first & 0xe000) !== 0x2000) return false;
+  if (first === 0x2001 && second === 0x0db8) return false;
+  return true;
+}
+
+function isPublicIp(address) {
+  const normalized = address.toLowerCase().replace(/^\[|\]$/g, "");
+  const family = isIP(normalized);
+  if (family === 4) return isPublicIpv4(normalized);
+  if (family === 6) return isPublicIpv6(normalized);
+  return false;
 }
 
 function isLocalHostname(hostname) {
   const normalized = hostname.toLowerCase().replace(/^\[|\]$/g, "");
-  return (
+  if (
     normalized === "localhost" ||
     normalized.endsWith(".localhost") ||
     normalized.endsWith(".local") ||
-    normalized.endsWith(".internal") ||
-    normalized === "::" ||
-    normalized === "::1" ||
-    normalized.startsWith("fc") ||
-    normalized.startsWith("fd") ||
-    normalized.startsWith("fe80:") ||
-    normalized.startsWith("::ffff:127.") ||
-    isPrivateIpv4(normalized)
-  );
+    normalized.endsWith(".internal")
+  ) return true;
+  return isIP(normalized) !== 0 && !isPublicIp(normalized);
+}
+
+export function systemLookupFactory(ResolverClass = Resolver) {
+  const resolver = new ResolverClass();
+  return {
+    async lookup(hostname) {
+      const results = await Promise.allSettled([
+        resolver.resolve4(hostname),
+        resolver.resolve6(hostname)
+      ]);
+      const records = [];
+      if (results[0].status === "fulfilled") {
+        records.push(...results[0].value.map((address) => ({ address, family: 4 })));
+      }
+      if (results[1].status === "fulfilled") {
+        records.push(...results[1].value.map((address) => ({ address, family: 6 })));
+      }
+      if (records.length === 0) throw new Error("hostname has no address records");
+      return records;
+    },
+    cancel() {
+      resolver.cancel();
+    }
+  };
+}
+
+async function assertPublicHostname(apiOrigin, lookupSession, timeoutMs) {
+  const hostname = new URL(apiOrigin).hostname.replace(/^\[|\]$/g, "");
+  if (isIP(hostname)) return;
+
+  let timeout;
+  let records;
+  try {
+    records = await Promise.race([
+      lookupSession.lookup(hostname),
+      new Promise((_, reject) => {
+        timeout = setTimeout(
+          () => {
+            reject(new LiveApiVerificationError(`DNS lookup timed out after ${timeoutMs}ms`));
+            try {
+              lookupSession.cancel();
+            } catch {
+              // The timeout error remains the public failure even if a custom
+              // test resolver cannot be cancelled cleanly.
+            }
+          },
+          timeoutMs
+        );
+      })
+    ]);
+  } catch (error) {
+    if (error instanceof LiveApiVerificationError) throw error;
+    fail("live API hostname could not be resolved");
+  } finally {
+    clearTimeout(timeout);
+  }
+  if (!Array.isArray(records) || records.length === 0) fail("live API hostname could not be resolved");
+  if (records.some((record) => !record || !isPublicIp(record.address))) {
+    fail("live API hostname resolves to a non-public address");
+  }
 }
 
 /**
@@ -97,6 +185,9 @@ export function normalizeLiveApiUrl(rawValue) {
   if (parsed.pathname !== "/") fail("live API URL must be an origin without a path");
   if (parsed.port && parsed.port !== "443") fail("live API URL must use the standard HTTPS port");
   if (isLocalHostname(parsed.hostname)) fail("live API URL must not target a local or private host");
+  if (!parsed.hostname.toLowerCase().endsWith(".workers.dev")) {
+    fail("live API URL must target a workers.dev Worker");
+  }
   if (!parsed.hostname.includes(".") && !parsed.hostname.includes(":")) {
     fail("live API URL must use a public hostname");
   }
@@ -274,15 +365,31 @@ function headers(values = {}) {
 export async function verifyLiveApi({
   apiUrl,
   fetchImpl = globalThis.fetch,
+  lookupFactory = systemLookupFactory,
   randomUUID = globalThis.crypto?.randomUUID?.bind(globalThis.crypto),
   timeoutMs = DEFAULT_TIMEOUT_MS,
   maxResponseBytes = DEFAULT_MAX_RESPONSE_BYTES
 }) {
   const apiOrigin = normalizeLiveApiUrl(apiUrl);
   if (typeof fetchImpl !== "function") fail("Fetch API is unavailable; Node 22 is required");
+  if (typeof lookupFactory !== "function") fail("DNS lookup is unavailable; Node 22 is required");
   if (typeof randomUUID !== "function") fail("secure UUID generation is unavailable; Node 22 is required");
   assertPositiveInteger(timeoutMs, "configuration");
   assertPositiveInteger(maxResponseBytes, "configuration");
+  let lookupSession;
+  try {
+    lookupSession = lookupFactory();
+  } catch {
+    fail("DNS lookup is unavailable; Node 22 is required");
+  }
+  if (
+    !lookupSession ||
+    typeof lookupSession.lookup !== "function" ||
+    typeof lookupSession.cancel !== "function"
+  ) {
+    fail("DNS lookup is unavailable; Node 22 is required");
+  }
+  await assertPublicHostname(apiOrigin, lookupSession, timeoutMs);
 
   const health = await requestJson({
     fetchImpl,

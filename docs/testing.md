@@ -48,17 +48,19 @@ pnpm verify:live-api -- --url https://your-worker.workers.dev  # state-changing 
 ```
 
 The live verifier has no default endpoint and is intentionally outside `verify-local`.
-It accepts only a public HTTPS origin, uses an ephemeral UUIDv4 idempotency key,
-and bounds each request to 8 seconds and each JSON response to 64 KiB. It checks
-`/health`, publishes the documented three-point Sydney geometry, then requires the
-same record to be returned by the `minLat,minLng,maxLat,maxLng` bbox query. It emits
-statuses only: no URL, key, request body, response body, or credential is printed.
+It accepts only a public HTTPS `*.workers.dev` origin, bounds DNS resolution and
+fails closed if it returns any non-public address, uses an ephemeral UUIDv4
+idempotency key, and bounds each request to 8 seconds and each JSON response to
+64 KiB. It checks `/health`, publishes the
+documented three-point Sydney geometry, then requires the same record to be
+returned by the `minLat,minLng,maxLat,maxLng` bbox query. It emits statuses only:
+no URL, key, request body, response body, or credential is printed.
 
 ## Phase evidence
 
 | Phase | RED evidence | GREEN evidence | Coverage artifact | Status |
 | --- | --- | --- | --- | --- |
-| P0 | `node --test tools/audit/*.test.mjs` — missing docs/audit library | `make verify-local` now reruns bootstrap, test policy, coverage collection, Rust coverage, cleanup, and public audit in one gate, ending with `LOCAL_READY` | root coverage 85.60% lines, 86.33% branches, 88.73% funcs | green local |
+| P0 | `node --test tools/audit/*.test.mjs` — missing docs/audit library | `make verify-local` now reruns bootstrap, test policy, coverage collection, Rust coverage, cleanup, and public audit in one gate, ending with `LOCAL_READY` | root coverage 88.34% lines, 86.64% branches, 91.83% funcs | green local |
 | P1 | `pnpm test` failed until `fixtures/sydney` manifest, assets and deterministic builder existed | `pnpm test`, `make fixture`, and `make verify-fixture` pass locally | root coverage includes fixture builders/verifiers | green local |
 | P2 | `cargo test --workspace --no-run` failed before the public versioned FFI/router surface was completed | `cargo test --workspace`, `cargo clippy --workspace --all-targets -- -D warnings`, and `cargo llvm-cov --workspace --all-targets --fail-under-lines 80` pass locally | Rust workspace 93.67% lines, 93.33% functions | green local |
 | P3 | bridge ownership and mobile offline tests | `ANDROID_SERIAL=localhost:5555 ./scripts/device/smoke-route.sh` plus `./scripts/device/verify-release.sh` and direct two-tap `adb input tap` evidence | mobile coverage 91.01% lines, 83.07% branches, 88.46% funcs; device evidence under `docs/evidence/` | green device-local |

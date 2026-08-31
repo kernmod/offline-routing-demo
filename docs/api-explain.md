@@ -105,16 +105,18 @@ D1. See [ADR 0003](adr/0003-spatial-index.md) for the model and limits.
 ## Deployment handoff
 
 Create a new D1 database in the target Cloudflare account, replace only the
-placeholder `database_id` in `apps/api/wrangler.toml`, and set
-`ALLOWED_ORIGINS` to the final viewer origin. Before any deploy, set the secret
-outside Git:
+placeholder `database_id` in `apps/api/wrangler.toml`, then configure the GitHub
+variable `VIEWER_ORIGIN` with the final public HTTPS Pages origin. The deployment
+workflow requires `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, and a random
+`RATE_LIMIT_SALT` of at least 32 characters as GitHub secrets. It validates the
+production origin and salt, creates a mode-0600 secrets file under the ephemeral
+runner directory before any remote mutation, applies migrations, and passes the
+file to `wrangler deploy` via `--secrets-file`. This makes initial Worker creation
+and secret provisioning one operation; it does not depend on a Worker already
+existing. An `always()` cleanup removes the temporary file after the deploy step.
 
-```bash
-cd apps/api
-wrangler secret put RATE_LIMIT_SALT
-```
-
-Then apply migrations remotely and deploy with Wrangler. Credentials remain in
-the Cloudflare dashboard or the caller's environment; they are never committed.
+After Wrangler returns the Worker URL, configure the public repository variable
+`SEGMENTS_API_URL` for the Pages build. Credentials remain in GitHub or the
+caller's environment; they are never committed.
 Record the resulting URL, remote migration output, and a publish/read smoke test
 before changing this status from `LOCAL_READY`.
