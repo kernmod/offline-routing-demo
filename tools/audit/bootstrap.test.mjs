@@ -142,6 +142,7 @@ test("GitHub Pages deploys the viewer safely under the repository sub-path", () 
   assert.match(pages, /actions\/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020/);
   assert.match(pages, /actions\/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9/);
   assert.match(pages, /actions\/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d/);
+  assert.match(pages, /name: Configure Pages[\s\S]*with:\s*\n\s+enablement: true/);
   assert.match(pages, /actions\/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128/);
   assert.match(pages, /path:\s*apps\/viewer\/dist/);
   assert.match(buildJob, /\n    permissions:\n      contents: read\n    steps:/);
