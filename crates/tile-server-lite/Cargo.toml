@@ -1,0 +1,17 @@
+[package]
+name = "tile-server-lite"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+crate-type = ["rlib", "cdylib"]
+
+[dependencies]
+tiny_http.workspace = true
+memmap2.workspace = true
+thiserror.workspace = true
+flate2.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

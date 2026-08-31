@@ -1,0 +1,61 @@
+name: pages
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.24.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.23.2
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Build viewer
+        env:
+          SEGMENTS_API_URL: ${{ vars.SEGMENTS_API_URL }}
+          VITE_API_BASE_URL: ${{ vars.SEGMENTS_API_URL }}
+          VITE_VIEWER_BASE: /offline-routing-demo/
+        run: |
+          node --input-type=module -e '
+            const value = process.env.SEGMENTS_API_URL;
+            if (!value) throw new Error("SEGMENTS_API_URL repository variable is required");
+            const url = new URL(value);
+            if (url.protocol !== "https:" || url.username || url.password || url.search || url.hash) {
+              throw new Error("SEGMENTS_API_URL must be a public HTTPS origin or base path");
+            }
+          '
+          pnpm --filter @offline-routing/viewer build
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: apps/viewer/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Configure Pages
+        uses: actions/configure-pages@v6
+      - name: Deploy Pages artifact
+        id: deployment
+        uses: actions/deploy-pages@v5

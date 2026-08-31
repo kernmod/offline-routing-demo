@@ -1,0 +1,12 @@
+{
+  "$schema": "https://nitro.margelo.com/nitro.schema.json",
+  "npmPackageName": "react-native-offline-router",
+  "cxxNamespace": ["offlinerouter"],
+  "ios": { "iosModuleName": "OfflineRouter" },
+  "android": {
+    "androidNamespace": ["offlinerouter"],
+    "androidCxxLibName": "OfflineRouter"
+  },
+  "ignorePaths": ["**/node_modules/**"],
+  "autolinking": { "OfflineRouterNative": { "cpp": "HybridOfflineRouterNative" } }
+}

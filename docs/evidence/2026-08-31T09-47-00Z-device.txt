@@ -1,0 +1,5 @@
+1
+14
+x86_64
+redroid14_x86_64
+    versionName=1.0.0

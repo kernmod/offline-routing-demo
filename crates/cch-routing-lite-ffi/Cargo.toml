@@ -1,0 +1,12 @@
+[package]
+name = "cch-routing-lite-ffi"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+crate-type = ["rlib", "cdylib"]
+
+[dependencies]
+cch-routing-lite = { path = "../cch-routing-lite" }
+serde_json.workspace = true

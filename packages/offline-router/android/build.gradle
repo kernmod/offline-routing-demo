@@ -1,0 +1,68 @@
+buildscript { repositories { google(); mavenCentral() }; dependencies { classpath "com.android.tools.build:gradle:8.8.0" } }
+apply plugin: "com.android.library"
+apply plugin: "org.jetbrains.kotlin.android"
+apply from: "../nitrogen/generated/android/OfflineRouter+autolinking.gradle"
+def isNewArchitectureEnabled() { return rootProject.hasProperty("newArchEnabled") && rootProject.getProperty("newArchEnabled") == "true" }
+if (isNewArchitectureEnabled()) { apply plugin: "com.facebook.react" }
+def rustLibOutputDir = file("$buildDir/rustJniLibs")
+def selectedArchitectures = ((rootProject.findProperty("reactNativeArchitectures") ?: "arm64-v8a,x86_64") as String)
+  .split(",")
+  .collect { it.trim() }
+  .findAll { !it.isEmpty() }
+tasks.register("buildRustJniLibs", Exec) {
+  workingDir file("..")
+  commandLine "node", "scripts/build-android-rust.mjs",
+    "--out-dir", rustLibOutputDir.absolutePath,
+    "--ndk", android.ndkDirectory.absolutePath,
+    "--profile", "release",
+    "--abis", selectedArchitectures.join(",")
+  inputs.files(
+    file("../../../Cargo.toml"),
+    file("../../../Cargo.lock"),
+    file("../../../crates/cch-routing-lite/Cargo.toml"),
+    file("../../../crates/cch-routing-lite/src/lib.rs"),
+    file("../../../crates/cch-routing-lite-ffi/Cargo.toml"),
+    file("../../../crates/cch-routing-lite-ffi/src/lib.rs"),
+    file("../../../crates/tile-server-lite/Cargo.toml"),
+    file("../../../crates/tile-server-lite/src/lib.rs"),
+    file("CMakeLists.txt")
+  )
+  outputs.dir(rustLibOutputDir)
+}
+android {
+  namespace "com.offlinerouter"
+  ndkVersion rootProject.ext.ndkVersion
+  compileSdkVersion rootProject.ext.compileSdkVersion
+  defaultConfig {
+    minSdkVersion rootProject.ext.minSdkVersion
+    targetSdkVersion rootProject.ext.targetSdkVersion
+    ndk { abiFilters.addAll(selectedArchitectures) }
+    externalNativeBuild { cmake { cppFlags "-frtti -fexceptions -Wall -Wextra"; arguments "-DANDROID_STL=c++_shared" } }
+  }
+  externalNativeBuild { cmake { path "CMakeLists.txt" } }
+  sourceSets {
+    main {
+      // CMake links these shared libraries, but AGP only packages them when
+      // they are declared as JNI source artifacts.
+      jniLibs.srcDirs(rustLibOutputDir)
+    }
+  }
+  buildFeatures { prefab true }
+}
+preBuild.dependsOn(tasks.named("buildRustJniLibs"))
+tasks.matching { it.name.startsWith("buildCMakeRelWithDebInfo") }.configureEach { task ->
+  def configureTaskName = task.name.replaceFirst("buildCMakeRelWithDebInfo", "configureCMakeRelWithDebInfo")
+  dependsOn(tasks.named(configureTaskName))
+}
+if (isNewArchitectureEnabled()) {
+  react {
+    jsRootDir = file("../src/")
+    libraryName = "OfflineRouter"
+    codegenJavaPackageName = "com.offlinerouter"
+  }
+}
+dependencies {
+  implementation "com.facebook.fbjni:fbjni:0.7.0"
+  implementation "com.facebook.react:react-android"
+  implementation project(":react-native-nitro-modules")
+}

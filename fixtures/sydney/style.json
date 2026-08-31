@@ -1,0 +1,78 @@
+{
+  "version": 8,
+  "name": "Sydney field notes",
+  "glyphs": "./glyphs/{fontstack}/{range}.pbf",
+  "sources": {
+    "offline": {
+      "type": "vector",
+      "url": "pmtiles://map.pmtiles",
+      "attribution": "© OpenStreetMap contributors"
+    }
+  },
+  "layers": [
+    {
+      "id": "paper",
+      "type": "background",
+      "paint": {
+        "background-color": "#1a1d1a"
+      }
+    },
+    {
+      "id": "paths",
+      "type": "line",
+      "source": "offline",
+      "source-layer": "roads",
+      "filter": [
+        "==",
+        [
+          "get",
+          "class"
+        ],
+        "path"
+      ],
+      "paint": {
+        "line-color": "#7a8a6b",
+        "line-width": 1.3,
+        "line-opacity": 0.8
+      }
+    },
+    {
+      "id": "streets",
+      "type": "line",
+      "source": "offline",
+      "source-layer": "roads",
+      "filter": [
+        "==",
+        [
+          "get",
+          "class"
+        ],
+        "street"
+      ],
+      "paint": {
+        "line-color": "#e8e2d3",
+        "line-width": 2,
+        "line-opacity": 0.82
+      }
+    },
+    {
+      "id": "major-roads",
+      "type": "line",
+      "source": "offline",
+      "source-layer": "roads",
+      "filter": [
+        "==",
+        [
+          "get",
+          "class"
+        ],
+        "major"
+      ],
+      "paint": {
+        "line-color": "#c89b6b",
+        "line-width": 2.8,
+        "line-opacity": 0.9
+      }
+    }
+  ]
+}

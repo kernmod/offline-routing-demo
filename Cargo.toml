@@ -1,0 +1,33 @@
+[workspace]
+members = [
+  "crates/cch-routing-lite",
+  "crates/cch-routing-lite-ffi",
+  "crates/tile-server-lite"
+]
+resolver = "2"
+
+[workspace.package]
+edition = "2021"
+license = "MIT OR Apache-2.0"
+version = "0.1.0"
+
+[workspace.dependencies]
+thiserror = "2.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+postcard = { version = "1.1", default-features = false, features = ["alloc"] }
+clap = { version = "4.5", features = ["derive"] }
+zstd = "0.13"
+sha2 = "0.10"
+osmpbf = "0.3"
+rayon = "1.11"
+parking_lot = "0.12"
+bytemuck = { version = "1.17", features = ["derive", "extern_crate_alloc"] }
+bitvec = { version = "1.0", features = ["serde"] }
+kiddo = "5"
+flate2 = { version = "1", default-features = false, features = ["rust_backend"] }
+tempfile = "3.13"
+memmap2 = "0.9"
+tiny_http = "0.12"
+uuid = { version = "1.11", features = ["v4", "serde"] }
+proptest = "1.6"

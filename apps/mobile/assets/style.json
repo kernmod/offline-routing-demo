@@ -1,0 +1,13 @@
+{
+  "version": 8,
+  "name": "Sydney offline technical map",
+  "sources": {
+    "offline": { "type": "vector", "tiles": ["http://127.0.0.1:$PORT/tiles/{z}/{x}/{y}.pbf"], "minzoom": 0, "maxzoom": 15, "attribution": "© OpenStreetMap contributors" }
+  },
+  "layers": [
+    { "id": "background", "type": "background", "paint": { "background-color": "#07131d" } },
+    { "id": "paths", "type": "line", "source": "offline", "source-layer": "roads", "filter": ["==", ["get", "class"], "path"], "paint": { "line-color": "#2b6270", "line-width": 1.25 } },
+    { "id": "streets", "type": "line", "source": "offline", "source-layer": "roads", "filter": ["==", ["get", "class"], "street"], "paint": { "line-color": "#dce5e3", "line-width": 1.7 } },
+    { "id": "major", "type": "line", "source": "offline", "source-layer": "roads", "filter": ["==", ["get", "class"], "major"], "paint": { "line-color": "#d8a340", "line-width": 2.7 } }
+  ]
+}

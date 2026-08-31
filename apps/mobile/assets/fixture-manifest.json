@@ -1,0 +1,6 @@
+{
+  "fixture": "sydney-cbd-walking-v1",
+  "assets": ["tiles.pmtiles", "routing.pack", "style.json"],
+  "network": "none during offline boot, map display, taps, route calculation",
+  "attribution": "© OpenStreetMap contributors, ODbL-1.0"
+}

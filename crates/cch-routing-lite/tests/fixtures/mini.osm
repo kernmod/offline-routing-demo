@@ -1,0 +1,113 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<!--
+  Mini OSM fixture for routing_graph extraction tests.
+  Contains 20 nodes, 5 ways within a ~0.01° × 0.01° bbox.
+
+  Nodes 1-5:   Way 1 (path, oneway:foot=yes, >500m total)
+  Nodes 5-9:   Way 2 (track, surface=gravel; node 8 has ford=yes)
+  Nodes 10-14: Way 3 (residential)
+  Nodes 10,15-17: Way 4 (cycleway, foot=yes; shares node 10 with Way 3)
+  Nodes 18-20: Way 5 (service, access=private, foot=designated)
+
+  Intersections:
+    - Node 5: shared between Way 1 and Way 2
+    - Node 10: shared between Way 3 and Way 4
+
+  To regenerate PBF:
+    osmium cat mini.osm -o mini.osm.pbf
+-->
+<osm version='0.6' generator='hand-crafted fixture'>
+  <bounds minlat="45.000" minlon="6.500" maxlat="45.010" maxlon="6.510"/>
+
+  <!-- Way 1 nodes: path heading north, ~600m total (oneway:foot=yes) -->
+  <!-- Spacing: ~150m between nodes (0.00135° lat ≈ 150m) -->
+  <node id="1" lat="45.0000" lon="6.5020"/>
+  <node id="2" lat="45.0014" lon="6.5022"/>
+  <node id="3" lat="45.0028" lon="6.5024"/>
+  <node id="4" lat="45.0042" lon="6.5023"/>
+  <node id="5" lat="45.0056" lon="6.5025"/>
+
+  <!-- Way 2 nodes: track heading east from node 5, ~400m total -->
+  <!-- Node 8 has ford=yes -->
+  <node id="6" lat="45.0056" lon="6.5040"/>
+  <node id="7" lat="45.0057" lon="6.5055"/>
+  <node id="8" lat="45.0056" lon="6.5065">
+    <tag k="ford" v="yes"/>
+  </node>
+  <node id="9" lat="45.0055" lon="6.5080"/>
+
+  <!-- Way 3 nodes: residential street, ~350m -->
+  <node id="10" lat="45.0030" lon="6.5060"/>
+  <node id="11" lat="45.0030" lon="6.5075"/>
+  <node id="12" lat="45.0030" lon="6.5085"/>
+  <node id="13" lat="45.0032" lon="6.5095"/>
+  <node id="14" lat="45.0033" lon="6.5100"/>
+
+  <!-- Way 4 nodes: cycleway with foot=yes, shares node 10 with Way 3 -->
+  <node id="15" lat="45.0020" lon="6.5055"/>
+  <node id="16" lat="45.0015" lon="6.5050"/>
+  <node id="17" lat="45.0010" lon="6.5060"/>
+
+  <!-- Way 5 nodes: service road, access=private but foot=designated -->
+  <node id="18" lat="45.0045" lon="6.5080"/>
+  <node id="19" lat="45.0048" lon="6.5090"/>
+  <node id="20" lat="45.0050" lon="6.5095"/>
+
+  <!-- Way 1: path, oneway:foot=yes, >500m total -->
+  <way id="101">
+    <nd ref="1"/>
+    <nd ref="2"/>
+    <nd ref="3"/>
+    <nd ref="4"/>
+    <nd ref="5"/>
+    <tag k="highway" v="path"/>
+    <tag k="sac_scale" v="hiking"/>
+    <tag k="surface" v="dirt"/>
+    <tag k="oneway:foot" v="yes"/>
+  </way>
+
+  <!-- Way 2: track, surface=gravel, node 8 has ford -->
+  <way id="102">
+    <nd ref="5"/>
+    <nd ref="6"/>
+    <nd ref="7"/>
+    <nd ref="8"/>
+    <nd ref="9"/>
+    <tag k="highway" v="track"/>
+    <tag k="surface" v="gravel"/>
+  </way>
+
+  <!-- Way 3: residential street -->
+  <way id="103">
+    <nd ref="10"/>
+    <nd ref="11"/>
+    <nd ref="12"/>
+    <nd ref="13"/>
+    <nd ref="14"/>
+    <tag k="highway" v="residential"/>
+    <tag k="surface" v="asphalt"/>
+    <tag k="name" v="Rue du Village"/>
+  </way>
+
+  <!-- Way 4: cycleway with foot=yes (shares node 10 with Way 3) -->
+  <way id="104">
+    <nd ref="10"/>
+    <nd ref="15"/>
+    <nd ref="16"/>
+    <nd ref="17"/>
+    <tag k="highway" v="cycleway"/>
+    <tag k="foot" v="yes"/>
+    <tag k="surface" v="asphalt"/>
+  </way>
+
+  <!-- Way 5: service with access=private and foot=designated -->
+  <way id="105">
+    <nd ref="18"/>
+    <nd ref="19"/>
+    <nd ref="20"/>
+    <tag k="highway" v="service"/>
+    <tag k="access" v="private"/>
+    <tag k="foot" v="designated"/>
+  </way>
+
+</osm>

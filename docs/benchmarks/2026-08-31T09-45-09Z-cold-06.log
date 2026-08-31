@@ -1,0 +1,3 @@
+--------- beginning of main
+Running "main"
+OfflineRoutingBenchmark {"device":"redroid14_x86_64 (AX102)","corpusSize":1024,"failures":0,"maxMicros":1923,"minMicros":414,"p50Micros":1092,"p95Micros":1450,"p99Micros":1584,"packLoadMicros":104412,"successes":1024}

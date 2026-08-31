@@ -1,0 +1,25 @@
+{
+  "name": "@offline-routing/api",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "lint": "tsc --project tsconfig.json --noEmit",
+    "test": "node --import tsx --test test/*.test.ts",
+    "test:coverage": "c8 --check-coverage --lines 95 --functions 95 --branches 90 --reporter=text --reporter=lcov node --import tsx --test test/*.test.ts",
+    "d1:migrate:local": "node scripts/d1-local.mjs migrate",
+    "d1:explain:local": "node scripts/d1-local.mjs explain"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "5.20260831.1",
+    "@types/node": "22.15.21",
+    "c8": "10.1.3",
+    "tsx": "4.20.6",
+    "typescript": "5.9.3",
+    "wrangler": "4.127.1"
+  },
+  "dependencies": {
+    "@offline-routing/shared": "workspace:*"
+  }
+}

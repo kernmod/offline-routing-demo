@@ -1,0 +1,36 @@
+{
+  "name": "offline-routing-demo",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@10.24.0",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "test": "pnpm test:policy && pnpm test:root && pnpm -r test",
+    "test:coverage": "pnpm coverage:clean && pnpm coverage:root && pnpm -r test:coverage && pnpm coverage:mobile && pnpm coverage:offline-router && pnpm coverage:assert",
+    "test:root": "node --test tools/audit/*.test.mjs tools/fixtures/*.test.mjs",
+    "test:policy": "node tools/audit/test-policy.mjs",
+    "coverage:clean": "node tools/audit/coverage-evidence.mjs clean",
+    "coverage:root": "c8 --all --check-coverage --lines 80 --functions 80 --branches 80 --reporter text --reporter lcov --reports-dir coverage/js/root --include 'tools/audit/*.mjs' --include 'tools/fixtures/*.mjs' --exclude '**/*.test.mjs' node --test tools/audit/*.test.mjs tools/fixtures/*.test.mjs",
+    "coverage:mobile": "c8 --check-coverage --lines 80 --functions 80 --branches 80 --reporter text --reporter lcov --reports-dir coverage/js/mobile --include apps/mobile/app.js --include 'apps/mobile/src/*.ts' node --import tsx --test apps/mobile/app.test.js apps/mobile/offline-contract.test.js apps/mobile/src/*.test.js",
+    "coverage:offline-router": "c8 --check-coverage --lines 80 --functions 80 --branches 80 --reporter text --reporter lcov --reports-dir coverage/js/offline-router --include packages/offline-router/index.js node --test packages/offline-router/*.test.js",
+    "coverage:assert": "node tools/audit/coverage-evidence.mjs assert",
+    "lint": "pnpm -r lint",
+    "build": "pnpm -r build",
+    "audit:denylist": "node tools/audit/denylist.mjs",
+    "audit:structure": "node tools/audit/structure.mjs",
+    "audit:licenses": "node tools/audit/licenses.mjs",
+    "audit:dependencies": "node tools/audit/dependency-audit.mjs",
+    "audit:public": "pnpm audit:structure && pnpm audit:licenses && pnpm audit:denylist && pnpm audit:dependencies"
+  },
+  "devDependencies": {
+    "c8": "10.1.3",
+    "tsx": "4.20.6"
+  },
+  "pnpm": {
+    "overrides": {
+      "postcss": "8.5.26"
+    }
+  }
+}

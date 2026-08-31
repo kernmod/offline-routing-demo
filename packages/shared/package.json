@@ -1,0 +1,22 @@
+{
+  "name": "@offline-routing/shared",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "default": "./index.js"
+    }
+  },
+  "types": "./index.d.ts",
+  "scripts": {
+    "build": "node --check index.js && node --check bbox.js && node --check metrics.js && node --check point.js && node --check polyline.js && node --check tiles.js",
+    "lint": "node --check index.js && node --check bbox.js && node --check metrics.js && node --check point.js && node --check polyline.js && node --check tiles.js",
+    "test": "node --test",
+    "test:coverage": "c8 --check-coverage --lines 95 --functions 95 --branches 90 --reporter=text --reporter=lcov node --test"
+  },
+  "devDependencies": {
+    "c8": "10.1.3"
+  }
+}

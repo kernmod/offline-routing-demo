@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "id": "sydney-cbd-walking-v1",
+  "bbox": [
+    151.204,
+    -33.873,
+    151.217,
+    -33.862
+  ],
+  "source": {
+    "file": "source.osm.json",
+    "snapshot": "2026-08-31T07:49:41Z",
+    "attribution": "© OpenStreetMap contributors",
+    "license": "ODbL-1.0"
+  },
+  "build": {
+    "command": "make fixture",
+    "deterministic": true,
+    "network_required": false
+  },
+  "routing": {
+    "status": "ready",
+    "path": "routing.pack",
+    "source": "graph.json",
+    "builder_contract": "cch-routing-lite build-pack",
+    "command": "cargo run --release -p cch-routing-lite --bin build-pack -- fixtures/sydney/graph.json fixtures/sydney/routing.pack"
+  },
+  "budget": {
+    "max_bytes": 5000000
+  },
+  "assets": [
+    {
+      "path": "source.osm.json",
+      "bytes": 1545438,
+      "sha256": "40d41f7358682648c100ec341b4d96559c51d73a12dfb5e7ccf684e2b249ba72"
+    },
+    {
+      "path": "graph.json",
+      "bytes": 840023,
+      "sha256": "e803cb53fec5efed5e54d39d8401ff01d86b28bc52878180ffb19d7a4e55a287"
+    },
+    {
+      "path": "map.pmtiles",
+      "bytes": 680630,
+      "sha256": "706ff6ef92465001b8e9479468ce9de7c3fa1aadcea0f5a1697ad403de938562"
+    },
+    {
+      "path": "style.json",
+      "bytes": 1427,
+      "sha256": "084f1c5afb20fcf46631f9b47b2d64e767494c944be999764d2a350dd4039fdc"
+    },
+    {
+      "path": "glyphs/Offline Sans/0-255.pbf",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "ATTRIBUTION.md",
+      "bytes": 760,
+      "sha256": "5578d5f9ec25ec27ba2659a5d333595cb898a42307d0028ced79402822d6c5da"
+    },
+    {
+      "path": "routing.pack",
+      "bytes": 1124780,
+      "sha256": "f76d7fb4f9323db1eeb2f6cebe575c8ca3fda94c04e07d45b434f8adb6907088"
+    }
+  ]
+}
