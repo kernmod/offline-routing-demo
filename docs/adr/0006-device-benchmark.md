@@ -30,7 +30,8 @@ into routing latency.
 
 - Results are reproducible and regressions can compare the same corpus.
 - Failures cannot disappear from a percentile summary.
-- Current evidence characterizes `redroid14_x86_64 (AX102)`, not all Android
-  phones and not an arm64 production device.
+- Final evidence characterizes `redroid14_x86_64 isolated (AX102)` in a fresh
+  container with ADB bound to loopback, not all Android phones and not an arm64
+  production device.
 - A later physical-device report can be added without rewriting or deleting
   the emulator evidence.

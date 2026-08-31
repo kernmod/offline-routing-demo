@@ -195,19 +195,21 @@ The benchmark traverses the production Nitro/C++/Rust route path with a fixed
 1,024-query corpus. It records failures and separates pack loading from warm
 queries.
 
-Device: `redroid14_x86_64 (AX102)`, Android 14, x86_64 emulator, airplane mode.
+Device: `redroid14_x86_64 isolated (AX102)`, Android 14, x86_64 emulator,
+airplane mode, ADB exposed on loopback only.
 
 | Measurement | Result |
 | --- | ---: |
-| successful warm queries | 1,024 / 1,024 in every run |
-| median of 20 per-run p50 values | 1,108 µs |
-| median of 20 per-run p95 values | 1,481 µs |
-| median cold pack load | 98,734 µs |
-| cold pack load range | 95,134–111,614 µs |
+| successful warm queries | 20,480 / 20,480 |
+| median of 20 per-run p50 values | 1,177 µs |
+| median of 20 per-run p95 values | 1,613 µs |
+| median cold pack load | 98,508 µs |
+| cold pack load range | 92,363–111,232 µs |
 
-Raw JSON/log pairs and the method are under [docs/benchmarks](docs/benchmarks/)
-and [ADR 0006](docs/adr/0006-device-benchmark.md). These numbers characterize
-the named emulator, not every Android phone.
+The [isolated-device summary](docs/benchmarks/2026-08-31-redroid14-isolated-cold-summary.md),
+raw JSON/log pairs, and [ADR 0006](docs/adr/0006-device-benchmark.md) retain the
+method and inputs. These numbers characterize the named emulator, not every
+Android phone.
 
 ## Test and security posture
 

@@ -1,0 +1,1 @@
+{"device":"redroid14_x86_64 isolated (AX102)","corpusSize":1024,"failures":0,"maxMicros":1959,"minMicros":446,"p50Micros":1171,"p95Micros":1592,"p99Micros":1775,"packLoadMicros":105924,"successes":1024}

@@ -41,6 +41,18 @@ test("README describes the recruiter-facing problem and commands", () => {
   assert.equal(existsSync(resolve(root, "docs/evidence/2026-08-31T20-10-00Z-mobile-live.png")), true);
 });
 
+test("public evidence omits builder home paths", () => {
+  const evidenceDir = resolve(root, "docs/evidence");
+  const evidenceFiles = readdirSync(evidenceDir, { recursive: true })
+    .filter((name) => /\.(?:md|txt)$/i.test(name));
+
+  for (const name of evidenceFiles) {
+    const evidence = readFileSync(resolve(evidenceDir, name), "utf8");
+    assert.doesNotMatch(evidence, /\/(?:root|home)\//);
+    assert.doesNotMatch(evidence, /(?:localhost|127\.0\.0\.1):\d+/);
+  }
+});
+
 test("testing guide documents TDD and coverage thresholds", () => {
   const testing = read("docs/testing.md");
   assert.match(testing, /TDD/i);
@@ -64,15 +76,25 @@ test("CI executes public audit, tests, coverage, and secret scanning", () => {
   assert.match(ci, /clippy/);
 });
 
+test("CI pins every GitHub Action to an immutable commit", () => {
+  const ci = read(".github/workflows/ci.yml");
+  const actions = [...ci.matchAll(/^\s*(?:-\s+)?uses:\s*(\S+)/gm)].map((match) => match[1]);
+
+  assert.ok(actions.length > 0);
+  for (const action of actions) {
+    assert.match(action, /^[^@\s]+@[0-9a-f]{40}$/);
+  }
+});
+
 test("CI fetches complete history for the gitleaks push range", () => {
   const ci = read(".github/workflows/ci.yml");
-  const checkoutStart = ci.indexOf("- uses: actions/checkout@v4");
+  const checkoutStart = ci.indexOf("- uses: actions/checkout@");
   const checkoutEnd = ci.indexOf("\n      - ", checkoutStart + 1);
   const checkoutStep = ci.slice(checkoutStart, checkoutEnd);
 
   assert.notEqual(checkoutStart, -1);
   assert.match(checkoutStep, /fetch-depth:\s*0/);
-  assert.ok(checkoutStart < ci.indexOf("gitleaks/gitleaks-action@v2"));
+  assert.ok(checkoutStart < ci.indexOf("gitleaks/gitleaks-action@"));
 });
 
 test("coverage is mandatory and CI preserves both JS and Rust LCOV evidence", () => {
@@ -86,7 +108,7 @@ test("coverage is mandatory and CI preserves both JS and Rust LCOV evidence", ()
   assert.match(manifest.scripts["coverage:root"], /tools\/audit/);
   assert.match(manifest.scripts["coverage:root"], /tools\/fixtures/);
   assert.match(manifest.scripts["test:coverage"], /coverage:assert/);
-  assert.match(ci, /actions\/upload-artifact@v4/);
+  assert.match(ci, /actions\/upload-artifact@[0-9a-f]{40}/);
   assert.match(ci, /coverage\/js/);
   assert.match(ci, /coverage\/rust\.lcov/);
   assert.match(ci, /if:\s*always\(\)/);

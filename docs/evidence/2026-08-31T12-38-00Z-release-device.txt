@@ -5,4 +5,4 @@ airplane_mode=1
 startup=pass
 back=pass
 route=local_native
-eec704f807ffff675714ebbee89b7f5774d32e483df8537bc90815c9e34aa445  /root/.offline-routing-demo/releases/offline-routing-demo-cchp1.apk
+apk_sha256=eec704f807ffff675714ebbee89b7f5774d32e483df8537bc90815c9e34aa445

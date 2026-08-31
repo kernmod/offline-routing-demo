@@ -1,7 +1,7 @@
 # Redroid Android 14 airplane-mode evidence
 
 The commands below were run against the explicitly named emulator
-`localhost:5555` (`redroid14_x86_64`, Android 14, x86_64). Before every
+`redroid14_x86_64` (Android 14, x86_64) over loopback-only ADB. Before every
 route and benchmark command, the harness checks `airplane_mode_on == 1` and
 disables Wi-Fi and cellular data.
 

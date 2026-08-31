@@ -1,5 +1,8 @@
 # Redroid Android 14 native CCH benchmark
 
+This initial run is retained as historical evidence. The release verdict uses
+the later [fresh isolated-device run](2026-08-31-redroid14-isolated-cold-summary.md).
+
 Device: `redroid14_x86_64 (AX102)`; Android 14; x86_64; airplane mode on.
 
 Twenty cold application loads ran the native Nitro benchmark. Each raw JSON

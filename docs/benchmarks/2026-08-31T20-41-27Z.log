@@ -1,0 +1,5 @@
+--------- beginning of main
+Running "main"
+OfflineRoutingBootReady {"mapPath":"file://<app-cache>/offline-routing-fixture/map.pmtiles","stylePath":"file://<app-cache>/offline-routing-fixture/style.json","packPath":"file://<app-cache>/offline-routing-fixture/routing.pack","styleUrl":"http://127.0.0.1:<ephemeral>/style.json"}
+OfflineRoutingBenchmark {"device":"redroid14_x86_64 isolated (AX102)","corpusSize":1024,"failures":0,"maxMicros":2334,"minMicros":700,"p50Micros":1171,"p95Micros":1583,"p99Micros":1746,"packLoadMicros":103421,"successes":1024}
+OfflineRoutingMapReady {"styleUrl":"http://127.0.0.1:<ephemeral>/style.json","networkAttempts":0}
