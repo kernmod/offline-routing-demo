@@ -1,0 +1,366 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+
+import {
+  LiveApiVerificationError,
+  normalizeLiveApiUrl,
+  resolveLiveApiUrl,
+  verifyLiveApi
+} from "./verify-api-lib.mjs";
+import { runLiveApiCli } from "./verify-api.mjs";
+
+const API_URL = "https://segments-api.example.workers.dev";
+const IDEMPOTENCY_KEY = "018f9be5-4370-4a48-9f64-571f55555555";
+const SEGMENT_ID = "8de15dc3-80d3-4c53-89e2-50b592076cf7";
+
+const record = {
+  id: SEGMENT_ID,
+  encodedGeometry: "vxdr_Awgal_Hfw@gw@",
+  pointCount: 3,
+  distanceM: 191,
+  bbox: {
+    minLat: -33.8701,
+    minLng: 151.2093,
+    maxLat: -33.8688,
+    maxLng: 151.2111
+  },
+  createdAt: "2026-08-31T12:34:00.000Z",
+  expiresAt: "2026-09-01T12:34:00.000Z",
+  isSeed: false
+};
+
+function jsonResponse(payload, { status = 200, headers = {} } = {}) {
+  return new Response(JSON.stringify(payload), {
+    status,
+    headers: {
+      "cache-control": "no-store",
+      "content-type": "application/json; charset=utf-8",
+      ...headers
+    }
+  });
+}
+
+function urlWithCredentials(origin, username, password = "", queryToken = "") {
+  const url = new URL(origin);
+  url.username = username;
+  url.password = password;
+  if (queryToken) url.searchParams.set("token", queryToken);
+  return url.href;
+}
+
+function successfulFetch(requests) {
+  return async (url, init) => {
+    requests.push({ url: String(url), init });
+    const path = new URL(url).pathname;
+    if (path === "/health") return jsonResponse({ ok: true });
+    if (path === "/segments" && init.method === "POST") return jsonResponse(record, { status: 201 });
+    if (path === "/segments" && init.method === "GET") {
+      return jsonResponse({ segments: [{ ...record, encodedGeometry: "different" }, record] });
+    }
+    throw new Error(`unexpected request path in test: ${path}`);
+  };
+}
+
+test("live URL policy accepts only an uncredentialed public HTTPS origin", () => {
+  assert.equal(normalizeLiveApiUrl(`${API_URL}/`), API_URL);
+
+  for (const invalid of [
+    "",
+    "http://segments.example",
+    "https://localhost",
+    urlWithCredentials("https://localhost", "localhost.example.com"),
+    "https://127.0.0.1",
+    "https://10.0.0.1",
+    "https://169.254.10.1",
+    "https://172.16.0.1",
+    "https://192.168.0.1",
+    "https://224.0.0.1",
+    "https://[::1]",
+    "https://[fc00::1]",
+    "https://[fe80::1]",
+    "https://printer.local",
+    "https://singlelabel",
+    "https://api.example:8443",
+    "https://api.example/path",
+    "https://api.example?token=secret",
+    urlWithCredentials("https://api.example", "fixture-user", "fixture-password")
+  ]) {
+    assert.throws(() => normalizeLiveApiUrl(invalid), LiveApiVerificationError, invalid);
+  }
+});
+
+test("URL resolution requires an explicit CLI flag or environment value", () => {
+  assert.equal(resolveLiveApiUrl(["--url", `${API_URL}/`], {}), API_URL);
+  assert.equal(resolveLiveApiUrl([`--url=${API_URL}`], {}), API_URL);
+  assert.equal(resolveLiveApiUrl([], { SEGMENTS_API_URL: API_URL }), API_URL);
+  assert.equal(resolveLiveApiUrl(["--url", API_URL], { SEGMENTS_API_URL: "https://ignored.example" }), API_URL);
+  assert.throws(() => resolveLiveApiUrl([], {}), /--url.*SEGMENTS_API_URL/);
+  assert.throws(() => resolveLiveApiUrl(["--wat"], {}), /unknown argument/);
+  assert.throws(() => resolveLiveApiUrl(["--url"], {}), /requires a value/);
+  assert.throws(() => resolveLiveApiUrl(["--url", API_URL, "--url", API_URL], {}), /only be provided once/);
+  assert.throws(() => resolveLiveApiUrl([`--url=${API_URL}`, `--url=${API_URL}`], {}), /only be provided once/);
+});
+
+test("verifier completes health, publish, and bbox read with bounded honest requests", async () => {
+  const requests = [];
+  const result = await verifyLiveApi({
+    apiUrl: API_URL,
+    fetchImpl: successfulFetch(requests),
+    randomUUID: () => IDEMPOTENCY_KEY
+  });
+
+  assert.deepEqual(result, {
+    apiOrigin: API_URL,
+    segmentId: SEGMENT_ID,
+    statuses: { health: 200, publish: 201, nearby: 200 }
+  });
+  assert.equal(requests.length, 3);
+  assert.equal(new URL(requests[0].url).pathname, "/health");
+  assert.equal(requests[0].init.method, "GET");
+  assert.equal(requests[1].init.method, "POST");
+  assert.equal(requests[1].init.headers["idempotency-key"], IDEMPOTENCY_KEY);
+  assert.equal(requests[1].init.headers.authorization, undefined);
+  assert.deepEqual(JSON.parse(requests[1].init.body), {
+    geometry: [
+      { lat: -33.8688, lng: 151.2093 },
+      { lat: -33.8695, lng: 151.2102 },
+      { lat: -33.8701, lng: 151.2111 }
+    ]
+  });
+  const nearbyUrl = new URL(requests[2].url);
+  assert.equal(nearbyUrl.pathname, "/segments");
+  assert.equal(nearbyUrl.searchParams.get("bbox"), "-33.871,151.208,-33.868,151.212");
+  for (const { init } of requests) {
+    assert.equal(init.redirect, "error");
+    assert.equal(init.credentials, "omit");
+    assert.equal(init.signal instanceof AbortSignal, true);
+  }
+});
+
+test("verifier accepts idempotent publish replay status 200", async () => {
+  const requests = [];
+  const fetchImpl = async (url, init) => {
+    const response = await successfulFetch(requests)(url, init);
+    if (new URL(url).pathname === "/segments" && init.method === "POST") {
+      return jsonResponse(record, { status: 200 });
+    }
+    return response;
+  };
+  const result = await verifyLiveApi({ apiUrl: API_URL, fetchImpl, randomUUID: () => IDEMPOTENCY_KEY });
+  assert.equal(result.statuses.publish, 200);
+});
+
+test("verifier rejects dishonest content and cache headers", async () => {
+  for (const headers of [
+    { "content-type": "text/html" },
+    { "cache-control": "public, max-age=3600" },
+    { "access-control-allow-origin": "*" },
+    { "access-control-allow-credentials": "true" }
+  ]) {
+    const fetchImpl = async () => jsonResponse({ ok: true }, { headers });
+    await assert.rejects(
+      verifyLiveApi({ apiUrl: API_URL, fetchImpl, randomUUID: () => IDEMPOTENCY_KEY }),
+      LiveApiVerificationError
+    );
+  }
+});
+
+test("verifier validates health and segment response contracts", async () => {
+  const invalidPayloads = [
+    { ok: false },
+    { ok: true, internal: "leak" },
+    null,
+    "not-json"
+  ];
+  for (const payload of invalidPayloads) {
+    const fetchImpl = async () => jsonResponse(payload);
+    await assert.rejects(
+      verifyLiveApi({ apiUrl: API_URL, fetchImpl, randomUUID: () => IDEMPOTENCY_KEY }),
+      /health response contract/
+    );
+  }
+
+  const fetchImpl = async (url, init) => {
+    const path = new URL(url).pathname;
+    if (path === "/health") return jsonResponse({ ok: true });
+    if (init.method === "POST") return jsonResponse({ ...record, pointCount: 2 }, { status: 201 });
+    return jsonResponse({ segments: [record] });
+  };
+  await assert.rejects(
+    verifyLiveApi({ apiUrl: API_URL, fetchImpl, randomUUID: () => IDEMPOTENCY_KEY }),
+    /publish response contract/
+  );
+});
+
+test("verifier requires the exact published record in the bbox read", async () => {
+  const fetchImpl = async (url, init) => {
+    const path = new URL(url).pathname;
+    if (path === "/health") return jsonResponse({ ok: true });
+    if (init.method === "POST") return jsonResponse(record, { status: 201 });
+    return jsonResponse({ segments: [{ ...record, encodedGeometry: "tampered" }] });
+  };
+  await assert.rejects(
+    verifyLiveApi({ apiUrl: API_URL, fetchImpl, randomUUID: () => IDEMPOTENCY_KEY }),
+    /published segment was not returned unchanged/
+  );
+});
+
+test("verifier enforces status, timeout, and response-size boundaries", async () => {
+  await assert.rejects(
+    verifyLiveApi({
+      apiUrl: API_URL,
+      fetchImpl: async () => jsonResponse({ error: "internal_error" }, { status: 503 }),
+      randomUUID: () => IDEMPOTENCY_KEY
+    }),
+    /health returned HTTP 503/
+  );
+
+  await assert.rejects(
+    verifyLiveApi({
+      apiUrl: API_URL,
+      fetchImpl: async () => jsonResponse({ ok: true }, { headers: { "content-length": "100000" } }),
+      maxResponseBytes: 1024,
+      randomUUID: () => IDEMPOTENCY_KEY
+    }),
+    /health response exceeds 1024 bytes/
+  );
+
+  await assert.rejects(
+    verifyLiveApi({
+      apiUrl: API_URL,
+      fetchImpl: async () => new Response("x".repeat(1025), {
+        headers: { "cache-control": "no-store", "content-type": "application/json" }
+      }),
+      maxResponseBytes: 1024,
+      randomUUID: () => IDEMPOTENCY_KEY
+    }),
+    /health response exceeds 1024 bytes/
+  );
+
+  const hangingFetch = async (_url, { signal }) => new Promise((_resolve, reject) => {
+    signal.addEventListener("abort", () => reject(signal.reason), { once: true });
+  });
+  await assert.rejects(
+    verifyLiveApi({
+      apiUrl: API_URL,
+      fetchImpl: hangingFetch,
+      timeoutMs: 10,
+      randomUUID: () => IDEMPOTENCY_KEY
+    }),
+    /health request timed out after 10ms/
+  );
+});
+
+test("verifier rejects malformed bodies, transport failures, and unsafe runtime configuration", async () => {
+  const cases = [
+    {
+      fetchImpl: async () => new Response("{", {
+        headers: { "cache-control": "no-store", "content-type": "application/json" }
+      }),
+      expected: /health response is not valid JSON/
+    },
+    {
+      fetchImpl: async () => new Response(null, {
+        headers: { "cache-control": "no-store", "content-type": "application/json" }
+      }),
+      expected: /health response body is missing/
+    },
+    {
+      fetchImpl: async () => jsonResponse({ ok: true }, { headers: { "content-length": "nope" } }),
+      expected: /invalid content-length/
+    },
+    {
+      fetchImpl: async () => { throw new Error("transport-secret"); },
+      expected: /health request failed/
+    }
+  ];
+  for (const { fetchImpl, expected } of cases) {
+    await assert.rejects(
+      verifyLiveApi({ apiUrl: API_URL, fetchImpl, randomUUID: () => IDEMPOTENCY_KEY }),
+      expected
+    );
+  }
+
+  await assert.rejects(
+    verifyLiveApi({ apiUrl: API_URL, fetchImpl: null, randomUUID: () => IDEMPOTENCY_KEY }),
+    /Fetch API is unavailable/
+  );
+  await assert.rejects(
+    verifyLiveApi({ apiUrl: API_URL, fetchImpl: async () => jsonResponse({ ok: true }), randomUUID: null }),
+    /UUID generation is unavailable/
+  );
+  await assert.rejects(
+    verifyLiveApi({ apiUrl: API_URL, fetchImpl: async () => jsonResponse({ ok: true }), randomUUID: () => "bad" }),
+    /invalid UUIDv4/
+  );
+  await assert.rejects(
+    verifyLiveApi({
+      apiUrl: API_URL,
+      fetchImpl: async () => jsonResponse({ ok: true }),
+      randomUUID: () => IDEMPOTENCY_KEY,
+      timeoutMs: 0
+    }),
+    /configuration response contract is invalid/
+  );
+});
+
+test("verifier rejects a malformed nearby envelope", async () => {
+  const fetchImpl = async (url, init) => {
+    const path = new URL(url).pathname;
+    if (path === "/health") return jsonResponse({ ok: true });
+    if (init.method === "POST") return jsonResponse(record, { status: 201 });
+    return jsonResponse({ segments: "not-an-array" });
+  };
+  await assert.rejects(
+    verifyLiveApi({ apiUrl: API_URL, fetchImpl, randomUUID: () => IDEMPOTENCY_KEY }),
+    /nearby response contract/
+  );
+});
+
+test("errors never echo URL credentials, query secrets, idempotency keys, or response bodies", async () => {
+  const secrets = ["username", "password", "query-secret", IDEMPOTENCY_KEY, "body-secret"];
+  let message = "";
+  try {
+    await verifyLiveApi({
+      apiUrl: urlWithCredentials("https://api.example", "username", "password", "query-secret"),
+      fetchImpl: async () => jsonResponse({ error: "body-secret" }, { status: 500 }),
+      randomUUID: () => IDEMPOTENCY_KEY
+    });
+  } catch (error) {
+    message = error instanceof Error ? error.message : String(error);
+  }
+  assert.notEqual(message, "");
+  for (const secret of secrets) assert.equal(message.includes(secret), false, secret);
+});
+
+test("CLI reports only public status evidence and never request material", async () => {
+  let stdout = "";
+  let stderr = "";
+  const exitCode = await runLiveApiCli({
+    argv: ["--url", API_URL],
+    env: {},
+    stdout: { write: (value) => { stdout += value; } },
+    stderr: { write: (value) => { stderr += value; } },
+    fetchImpl: successfulFetch([]),
+    uuid: () => IDEMPOTENCY_KEY
+  });
+  assert.equal(exitCode, 0);
+  assert.equal(stdout, "LIVE_API_OK health=200 publish=201 nearby=200\n");
+  assert.equal(stderr, "");
+  for (const hidden of [API_URL, IDEMPOTENCY_KEY, SEGMENT_ID]) assert.equal(stdout.includes(hidden), false);
+});
+
+test("CLI failure output is generic and credential-free", async () => {
+  let stdout = "";
+  let stderr = "";
+  const exitCode = await runLiveApiCli({
+    argv: ["--url", urlWithCredentials("https://api.example", "user", "password", "secret")],
+    env: {},
+    stdout: { write: (value) => { stdout += value; } },
+    stderr: { write: (value) => { stderr += value; } }
+  });
+  assert.equal(exitCode, 1);
+  assert.equal(stdout, "");
+  assert.match(stderr, /^LIVE_API_FAILED /);
+  for (const hidden of ["user", "password", "secret"]) assert.equal(stderr.includes(hidden), false);
+});

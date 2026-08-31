@@ -44,7 +44,15 @@ pnpm test:coverage              # Node coverage plus package coverage gates
 cargo test --workspace          # Rust unit/property/integration tests
 cargo llvm-cov --workspace --all-targets --fail-under-lines 80
 make audit-public               # tree, history, remote, endpoint, artifact, secret gates
+pnpm verify:live-api -- --url https://your-worker.workers.dev  # state-changing live publish/read proof
 ```
+
+The live verifier has no default endpoint and is intentionally outside `verify-local`.
+It accepts only a public HTTPS origin, uses an ephemeral UUIDv4 idempotency key,
+and bounds each request to 8 seconds and each JSON response to 64 KiB. It checks
+`/health`, publishes the documented three-point Sydney geometry, then requires the
+same record to be returned by the `minLat,minLng,maxLat,maxLng` bbox query. It emits
+statuses only: no URL, key, request body, response body, or credential is printed.
 
 ## Phase evidence
 

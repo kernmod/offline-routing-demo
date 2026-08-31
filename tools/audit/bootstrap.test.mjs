@@ -158,6 +158,18 @@ test("public audit is non-mutating and runs every publication check", () => {
   assert.match(command, /audit:dependencies/);
 });
 
+test("live API verification is explicit and stays outside the offline local gate", () => {
+  const manifest = JSON.parse(read("package.json"));
+  const makefile = read("Makefile");
+
+  assert.equal(manifest.scripts["verify:live-api"], "node tools/live/verify-api.mjs");
+  assert.match(manifest.scripts["test:root"], /tools\/live\/\*\.test\.mjs/);
+  assert.match(manifest.scripts["coverage:root"], /tools\/live\/verify-api-lib\.mjs/);
+  assert.match(makefile, /^verify-live-api:\n\tpnpm verify:live-api$/m);
+  const localGate = makefile.match(/^verify-local:[^\n]+/m)?.[0] ?? "";
+  assert.doesNotMatch(localGate, /verify-live-api/);
+});
+
 test("architecture and public boundary stay honest about delivery status", () => {
   const architecture = read("docs/architecture.md");
   const boundary = read("docs/security/public-boundary.md");

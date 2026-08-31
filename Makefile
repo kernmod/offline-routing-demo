@@ -1,6 +1,6 @@
 SHELL := /bin/bash
 
-.PHONY: fixture verify-fixture build test test-policy coverage fmt lint clean-generated audit-public verify-local
+.PHONY: fixture verify-fixture build test test-policy coverage fmt lint clean-generated audit-public verify-live-api verify-local
 
 fixture:
 	node tools/fixtures/build.mjs --out fixtures/sydney
@@ -38,6 +38,9 @@ clean-generated:
 
 audit-public:
 	pnpm audit:public
+
+verify-live-api:
+	pnpm verify:live-api
 
 verify-local: fmt lint build test coverage clean-generated audit-public
 	@echo "LOCAL_READY"

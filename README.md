@@ -160,6 +160,20 @@ VITE_API_BASE_URL=http://127.0.0.1:8787 \
 The viewer's API origin is fixed by `VITE_API_BASE_URL` at build time. A public
 URL query parameter cannot redirect browser requests to another origin.
 
+Production deployment is intentionally explicit. The API workflow refuses the
+placeholder D1 identifier, applies versioned migrations non-interactively, checks
+that `RATE_LIMIT_SALT` already exists as a Worker secret, and only then deploys.
+GitHub Pages builds the viewer with the repository variable `SEGMENTS_API_URL`.
+After deployment, the state-changing contract smoke test is:
+
+```bash
+pnpm verify:live-api -- --url https://<worker-origin>
+```
+
+It accepts only a public HTTPS origin, publishes one bounded Sydney segment, and
+requires the same record to be returned by the bbox query. It prints statuses,
+never request bodies, credentials, URLs, or idempotency keys.
+
 ## Performance evidence
 
 The benchmark traverses the production Nitro/C++/Rust route path with a fixed

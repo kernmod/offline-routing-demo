@@ -1,0 +1,74 @@
+name: deploy-api
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/api/**"
+      - "packages/shared/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - ".node-version"
+      - ".github/workflows/deploy-api.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-api-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.24.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.23.2
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Validate deploy configuration
+        working-directory: apps/api
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFileSync } from "node:fs";
+          const config = readFileSync("wrangler.toml", "utf8");
+          const placeholder = "00000000-0000-0000-0000-000000000000";
+          if (config.includes(placeholder)) {
+            throw new Error("Replace the placeholder D1 database_id before deploying");
+          }
+          NODE
+      - name: Verify pre-provisioned Worker secrets
+        working-directory: apps/api
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          pnpm exec wrangler secret list --format json > "$RUNNER_TEMP/worker-secrets.json"
+          node --input-type=module <<'NODE'
+          import { readFileSync } from "node:fs";
+          const secrets = JSON.parse(readFileSync(process.env.RUNNER_TEMP + "/worker-secrets.json", "utf8"));
+          if (!Array.isArray(secrets) || !secrets.some(({ name }) => name === "RATE_LIMIT_SALT")) {
+            throw new Error("RATE_LIMIT_SALT must already be provisioned as a Worker secret");
+          }
+          NODE
+      - name: Apply remote D1 migrations
+        working-directory: apps/api
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: pnpm exec wrangler d1 migrations apply DB --remote --yes
+      - name: Deploy Worker
+        working-directory: apps/api
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: pnpm exec wrangler deploy
