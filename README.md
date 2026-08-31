@@ -143,7 +143,9 @@ The build creates a demo keystore under the user's home directory and writes
 the APK outside the repository. No signing material is versioned. The device
 gate inspects final APK permissions, installs it, verifies native startup,
 exercises Android back handling, and runs a local route while airplane mode is
-on.
+on. The latest clean-clone build proof records the
+[device result](docs/evidence/2026-08-31T12-38-00Z-release-device.txt) and
+[airplane-mode screen](docs/evidence/2026-08-31T12-38-00Z-release-device.png).
 
 ### API and viewer development
 
