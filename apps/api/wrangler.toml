@@ -3,14 +3,14 @@ main = "src/index.ts"
 compatibility_date = "2026-05-03"
 workers_dev = true
 
-# Local defaults only. Before a live deploy, create a D1 database and replace the
-# placeholder ID with Wrangler's generated value; no account identifier is committed.
+# Browser origins below are local defaults; production supplies its viewer origin
+# at deploy time. The public D1 identifier is committed with the binding below.
 [vars]
 ALLOWED_ORIGINS = "http://localhost:4173,http://127.0.0.1:4173"
 
 # Cloudflare's shared edge counter. `namespace_id` is a public configuration
-# namespace, not a credential. `RATE_LIMIT_SALT` is intentionally absent: set
-# it with `wrangler secret put RATE_LIMIT_SALT` before any production deploy.
+# namespace, not a credential. `RATE_LIMIT_SALT` is intentionally absent and the
+# production workflow injects it atomically through Wrangler's `--secrets-file`.
 [[ratelimits]]
 name = "RATE_LIMITER"
 namespace_id = "1001"
@@ -19,5 +19,5 @@ simple = { limit = 30, period = 60 }
 [[d1_databases]]
 binding = "DB"
 database_name = "offline-routing-segments"
-database_id = "00000000-0000-0000-0000-000000000000"
+database_id = "c5511217-d012-47a0-80bc-02dde6fccff5"
 migrations_dir = "migrations"

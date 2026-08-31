@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 
 const workflowPath = new URL("../../.github/workflows/deploy-api.yml", import.meta.url);
+const wranglerPath = new URL("../../apps/api/wrangler.toml", import.meta.url);
 
 function workflow() {
   return readFileSync(workflowPath, "utf8");
@@ -76,11 +77,26 @@ test("API deploy validates production inputs, migrates, then bootstraps atomical
   assert.ok(secretPreparation < migration, "the salt must be validated before remote migrations");
   assert.ok(migration < deploy, "remote migrations must finish before Worker deployment");
   assert.match(source, /node tools\/deploy\/validate-api-config\.mjs apps\/api\/wrangler\.toml/);
-  assert.match(source, /pnpm exec wrangler d1 migrations apply DB --remote --yes/);
+  assert.match(source, /pnpm exec wrangler d1 migrations apply DB --remote/);
   assert.match(source, /worker-secrets\.json/);
   assert.match(source, /writeFileSync\(path, JSON\.stringify\(\{ RATE_LIMIT_SALT: salt \}\), \{ mode: 0o600 \}\)/);
   assert.match(source, /pnpm exec wrangler deploy --var "ALLOWED_ORIGINS:\$VIEWER_ORIGIN" --secrets-file "\$RUNNER_TEMP\/worker-secrets\.json"/);
   assert.match(source, /name: Remove deployment secret[\s\S]*if: always\(\)[\s\S]*rmSync/);
+});
+
+test("D1 migrations use Wrangler 4 non-interactive CI mode", () => {
+  const migrationStep = workflow().match(/- name: Apply remote D1 migrations[\s\S]*?(?=\n      - name:)/)?.[0] ?? "";
+
+  assert.match(migrationStep, /CI: "true"[\s\S]*pnpm exec wrangler d1 migrations apply DB --remote$/m);
+  assert.doesNotMatch(migrationStep, /--yes\b/);
+});
+
+test("the live Wrangler config documents the atomic deployment path", () => {
+  const source = readFileSync(wranglerPath, "utf8");
+
+  assert.match(source, /public D1 identifier/);
+  assert.match(source, /--secrets-file/);
+  assert.doesNotMatch(source, /placeholder|wrangler secret put/);
 });
 
 test("API deployments are serialized without cancelling an active deployment", () => {

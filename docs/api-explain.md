@@ -1,8 +1,10 @@
 # Segment API contract
 
-Status: `LOCAL_READY` on 2026-08-31. The Worker builds, is covered, and runs
-against real local D1 through Wrangler. It is **not yet deployed**; no URL or
-live-API claim belongs in this document until the deploy evidence is recorded.
+Status: `LIVE_VERIFIED` on 2026-08-31. The Worker builds, is covered, runs
+against real local D1 through Wrangler, and is deployed at
+`https://offline-routing-segments.yaktrak.workers.dev`. The production smoke
+published a bounded Sydney geometry and read the same record through the bbox
+query; see [`docs/evidence/2026-08-31T19-49-00Z-live-api.md`](evidence/2026-08-31T19-49-00Z-live-api.md).
 
 ## Endpoints
 
@@ -104,8 +106,9 @@ D1. See [ADR 0003](adr/0003-spatial-index.md) for the model and limits.
 
 ## Deployment handoff
 
-Create a new D1 database in the target Cloudflare account, replace only the
-placeholder `database_id` in `apps/api/wrangler.toml`, then configure the GitHub
+The production D1 identifier is public configuration in `apps/api/wrangler.toml`.
+For a separate deployment, create a new D1 database, replace only that identifier,
+then configure the GitHub
 variable `VIEWER_ORIGIN` with the final public HTTPS Pages origin. The deployment
 workflow requires `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, and a random
 `RATE_LIMIT_SALT` of at least 32 characters as GitHub secrets. It validates the
@@ -115,8 +118,7 @@ file to `wrangler deploy` via `--secrets-file`. This makes initial Worker creati
 and secret provisioning one operation; it does not depend on a Worker already
 existing. An `always()` cleanup removes the temporary file after the deploy step.
 
-After Wrangler returns the Worker URL, configure the public repository variable
-`SEGMENTS_API_URL` for the Pages build. Credentials remain in GitHub or the
-caller's environment; they are never committed.
-Record the resulting URL, remote migration output, and a publish/read smoke test
-before changing this status from `LOCAL_READY`.
+The public repository variable `SEGMENTS_API_URL` points Pages at the verified
+Worker URL. Credentials remain in GitHub or the caller's environment; they are
+never committed. Every new production environment must repeat the migration,
+deploy, and live publish/read proof before claiming `LIVE_VERIFIED`.

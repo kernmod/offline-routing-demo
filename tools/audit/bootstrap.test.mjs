@@ -164,11 +164,16 @@ test("public audit is non-mutating and runs every publication check", () => {
 test("live API verification is explicit and stays outside the offline local gate", () => {
   const manifest = JSON.parse(read("package.json"));
   const makefile = read("Makefile");
+  const readme = read("README.md");
+  const testing = read("docs/testing.md");
 
   assert.equal(manifest.scripts["verify:live-api"], "node tools/live/verify-api.mjs");
   assert.match(manifest.scripts["test:root"], /tools\/live\/\*\.test\.mjs/);
   assert.match(manifest.scripts["coverage:root"], /tools\/live\/verify-api-lib\.mjs/);
   assert.match(makefile, /^verify-live-api:\n\tpnpm verify:live-api$/m);
+  assert.match(readme, /pnpm verify:live-api --url https:\/\/<worker-origin>/);
+  assert.match(testing, /pnpm verify:live-api --url https:\/\/your-worker\.workers\.dev/);
+  assert.doesNotMatch(`${readme}\n${testing}`, /verify:live-api -- --url/);
   const localGate = makefile.match(/^verify-local:[^\n]+/m)?.[0] ?? "";
   assert.doesNotMatch(localGate, /verify-live-api/);
 });

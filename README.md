@@ -17,15 +17,14 @@ or inherited product history.
 ## Try the complete flow
 
 Current delivery status: the fixture, native engine, Android release build,
-airplane-mode device proof, API contract, and viewer are verified locally.
-Public API, viewer, and GitHub Release URLs will appear here only after their
-external smoke tests pass.
+airplane-mode device proof, and API are verified. The viewer and GitHub Release
+remain local until their external smoke tests pass.
 
 | Experience | Link | Status |
 | --- | --- | --- |
 | Android APK | pending GitHub Release | local release verified |
 | Browser viewer | pending public URL | local WebGL E2E verified |
-| Segment API | pending Worker URL | local D1 integration verified |
+| Segment API | [offline-routing-segments.yaktrak.workers.dev](https://offline-routing-segments.yaktrak.workers.dev/health) | live publish/read verified |
 
 Playwright reference captures are kept for the
 [desktop viewer](apps/viewer/e2e/viewer-desktop.spec.ts-snapshots/viewer-desktop-desktop-chromium-linux.png)
@@ -173,13 +172,15 @@ variable `SEGMENTS_API_URL`.
 After deployment, the state-changing contract smoke test is:
 
 ```bash
-pnpm verify:live-api -- --url https://<worker-origin>
+pnpm verify:live-api --url https://<worker-origin>
 ```
 
 It accepts only the public HTTPS `*.workers.dev` origin produced by this deployment,
 bounds DNS resolution and rejects non-public answers, publishes one bounded Sydney
 segment, and requires the same record to be returned by the bbox query. It prints
 statuses, never request bodies, credentials, URLs, or idempotency keys.
+The first production migration/deploy and `201` → bbox-read proof are recorded
+in [the live API evidence](docs/evidence/2026-08-31T19-49-00Z-live-api.md).
 
 ## Performance evidence
 

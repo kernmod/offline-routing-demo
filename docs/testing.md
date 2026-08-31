@@ -44,7 +44,7 @@ pnpm test:coverage              # Node coverage plus package coverage gates
 cargo test --workspace          # Rust unit/property/integration tests
 cargo llvm-cov --workspace --all-targets --fail-under-lines 80
 make audit-public               # tree, history, remote, endpoint, artifact, secret gates
-pnpm verify:live-api -- --url https://your-worker.workers.dev  # state-changing live publish/read proof
+pnpm verify:live-api --url https://your-worker.workers.dev     # state-changing live publish/read proof
 ```
 
 The live verifier has no default endpoint and is intentionally outside `verify-local`.
@@ -64,7 +64,7 @@ no URL, key, request body, response body, or credential is printed.
 | P1 | `pnpm test` failed until `fixtures/sydney` manifest, assets and deterministic builder existed | `pnpm test`, `make fixture`, and `make verify-fixture` pass locally | root coverage includes fixture builders/verifiers | green local |
 | P2 | `cargo test --workspace --no-run` failed before the public versioned FFI/router surface was completed | `cargo test --workspace`, `cargo clippy --workspace --all-targets -- -D warnings`, and `cargo llvm-cov --workspace --all-targets --fail-under-lines 80` pass locally | Rust workspace 93.67% lines, 93.33% functions | green local |
 | P3 | bridge ownership and mobile offline tests | `ANDROID_SERIAL=localhost:5555 ./scripts/device/smoke-route.sh` plus `./scripts/device/verify-release.sh` and direct two-tap `adb input tap` evidence | mobile coverage 91.01% lines, 83.07% branches, 88.46% funcs; device evidence under `docs/evidence/` | green device-local |
-| P4 | `pnpm --filter @offline-routing/api test` failed before Worker exports, migrations, and D1 query helpers existed | Worker-shaped API, migrations, TTL, idempotency, `EXPLAIN QUERY PLAN`, and local D1 migrations pass locally | API coverage 99.21% lines, 92.68% branches, 100% funcs | green local |
+| P4 | `pnpm --filter @offline-routing/api test` failed before Worker exports, migrations, and D1 query helpers existed; the deploy workflow test then caught Wrangler 4 rejecting `--yes` | Worker contract, migrations, TTL, idempotency and query plan pass locally; production migrations plus `LIVE_API_OK health=200 publish=201 nearby=200` pass externally | API coverage 99.21% lines, 92.68% branches, 100% funcs | green live |
 | P5 | `pnpm --filter @offline-routing/viewer test` failed before the static shell and viewer client existed | unit tests plus Playwright desktop/mobile, API-down, and `/offline-routing-demo/` sub-path checks pass locally | viewer coverage 98.50% lines, 88.15% branches, 88.00% funcs | green local |
 | P6 | named-device harness assertions | `ANDROID_SERIAL=localhost:5555 BENCHMARK_DEVICE_NAME='redroid14_x86_64 (AX102)' ./scripts/device/benchmark.sh` plus 20 cold runs summarized in `docs/benchmarks/2026-08-31-redroid14-cold-summary.md` | raw benchmark JSON/log pairs under `docs/benchmarks/` | green device-local |
-| P7–P8 | deterministic rebuild and hostile audit fixtures | `make verify-local`, `make audit-public`, and `gitleaks dir /repo --no-banner --redact --exit-code 1` are green locally; live deploy/public release remain open | consolidated reports under `coverage/`, `docs/evidence/`, and `docs/security/` | local-ready |
+| P7–P8 | deterministic rebuild and hostile audit fixtures | `make verify-local`, `make audit-public`, and gitleaks are green locally; the API is live-verified while viewer, APK release, push and public-clone gates remain open | consolidated reports under `coverage/`, `docs/evidence/`, and `docs/security/` | API live; delivery open |
