@@ -18,5 +18,10 @@ export default defineConfig({
       exclude: ["src/main.tsx", "src/**/*.d.ts"]
     }
   },
-  resolve: { alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) } }
+  resolve: {
+    alias: {
+      "@": fileURLToPath(new URL("./src", import.meta.url)),
+      "@offline-routing/route-studio": fileURLToPath(new URL("../../packages/route-studio/index.js", import.meta.url))
+    }
+  }
 });

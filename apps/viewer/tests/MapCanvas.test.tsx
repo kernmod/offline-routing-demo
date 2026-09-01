@@ -4,6 +4,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const mapMocks = vi.hoisted(() => {
   type Handler = (...args: unknown[]) => void;
   let latestMap: FakeMap | undefined;
+  const markers: FakeMarker[] = [];
+  class FakeMarker {
+    handler?: Handler;
+    position = { lng: 151.21, lat: -33.869 };
+    constructor() { markers.push(this); }
+    setLngLat(value: [number, number]) { this.position = { lng: value[0], lat: value[1] }; return this; }
+    addTo() { return this; }
+    on(_event: string, handler: Handler) { this.handler = handler; return this; }
+    getLngLat() { return this.position; }
+    remove = vi.fn();
+    triggerDragEnd() { this.handler?.(); }
+  }
   class FakeMap {
     handlers = new Map<string, Handler>();
     source = { setData: vi.fn() };
@@ -28,10 +40,14 @@ const mapMocks = vi.hoisted(() => {
     trigger(event: string, data?: unknown, layer = "") { this.handlers.get(`${event}:${layer}`)?.(data); }
   }
   const addProtocol = vi.fn();
-  return { FakeMap, addProtocol, latest: () => latestMap, reset: () => { latestMap = undefined; } };
+  return { FakeMap, FakeMarker, addProtocol, latest: () => latestMap, markers, reset: () => { latestMap = undefined; markers.length = 0; } };
 });
 
-vi.mock("maplibre-gl", () => ({ default: { Map: mapMocks.FakeMap, addProtocol: mapMocks.addProtocol }, Map: mapMocks.FakeMap }));
+vi.mock("maplibre-gl", () => ({
+  default: { Map: mapMocks.FakeMap, Marker: mapMocks.FakeMarker, addProtocol: mapMocks.addProtocol },
+  Map: mapMocks.FakeMap,
+  Marker: mapMocks.FakeMarker
+}));
 vi.mock("pmtiles", () => ({ Protocol: class { tile = vi.fn(); } }));
 
 import { MapCanvas } from "../src/components/MapCanvas";
@@ -64,7 +80,7 @@ describe("MapCanvas", () => {
     act(() => mapMocks.latest()?.trigger("idle"));
     expect(onTilesReady).toHaveBeenCalledOnce();
     expect(mapMocks.latest()?.addSource).toHaveBeenCalledWith("published-segments", expect.anything());
-    expect(mapMocks.latest()?.addLayer).toHaveBeenCalledTimes(2);
+    expect(mapMocks.latest()?.addLayer).toHaveBeenCalledTimes(4);
 
     rerender(<MapCanvas segments={[segment]} selectedId="seed-sydney-cbd-001" onSelect={vi.fn()} onTilesReady={onTilesReady} onTilesError={vi.fn()} />);
     expect(mapMocks.latest()?.source.setData).toHaveBeenCalledWith(expect.objectContaining({ features: [expect.anything()] }));
@@ -103,5 +119,40 @@ describe("MapCanvas", () => {
     render(<MapCanvas segments={[]} selectedId={null} onSelect={vi.fn()} onTilesReady={vi.fn()} onTilesError={onTilesError} />);
     act(() => mapMocks.latest()?.trigger("error", { error: {} }));
     expect(onTilesError).toHaveBeenCalledWith("Embedded map assets could not be read.");
+  });
+
+  it("does not mutate paint before the MapLibre style is ready", () => {
+    const props = { segments: [], onSelect: vi.fn(), onTilesReady: vi.fn(), onTilesError: vi.fn() };
+    const { rerender } = render(<MapCanvas {...props} selectedId="pending" />);
+    const map = mapMocks.latest();
+    map?.isStyleLoaded.mockReturnValue(false);
+    map?.setPaintProperty.mockClear();
+    rerender(<MapCanvas {...props} selectedId="other" />);
+    expect(map?.setPaintProperty).not.toHaveBeenCalled();
+  });
+
+  it("adds map points and commits draggable control markers without a routing request", () => {
+    const onMapPoint = vi.fn();
+    const onControlMove = vi.fn();
+    render(
+      <MapCanvas
+        segments={[]}
+        selectedId={null}
+        onSelect={vi.fn()}
+        onTilesReady={vi.fn()}
+        onTilesError={vi.fn()}
+        onMapPoint={onMapPoint}
+        onControlMove={onControlMove}
+        controlPoints={[{ id: "cp-0001", lat: -33.87, lng: 151.2, elevationM: 8 }]}
+      />
+    );
+    act(() => mapMocks.latest()?.trigger("load"));
+    act(() => mapMocks.latest()?.trigger("click", { point: { x: 10, y: 10 }, lngLat: { lat: -33.869, lng: 151.211 } }));
+    expect(onMapPoint).toHaveBeenCalledWith({ lat: -33.869, lng: 151.211, elevationM: 0 });
+
+    expect(mapMocks.markers).toHaveLength(1);
+    mapMocks.markers[0].position = { lat: -33.8685, lng: 151.2115 };
+    act(() => mapMocks.markers[0].triggerDragEnd());
+    expect(onControlMove).toHaveBeenCalledWith("cp-0001", { lat: -33.8685, lng: 151.2115, elevationM: 8 });
   });
 });

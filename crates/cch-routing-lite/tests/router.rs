@@ -1,16 +1,21 @@
 use std::{cmp::Reverse, collections::BinaryHeap};
 
 use cch_routing_lite::{
-    build_pack, BuildConfig, Coordinate, GraphInput, PackArc, Router, RouterError,
-    MAX_PACK_ARC_WEIGHT, MAX_ROUTE_WEIGHT,
+    build_pack, BuildConfig, Coordinate, GraphInput, GraphNode, PackArc, RoutePoint, Router,
+    RouterError, MAX_PACK_ARC_WEIGHT, MAX_ROUTE_WEIGHT,
 };
+
+fn node(lat: f64, lng: f64) -> GraphNode {
+    GraphNode::new(lat, lng, 0)
+}
+
 use proptest::prelude::*;
 use zstd::stream::{decode_all, encode_all};
 
 fn chain() -> GraphInput {
     GraphInput {
         nodes: (0..5)
-            .map(|i| Coordinate::new(45.0, 6.0 + f64::from(i) * 0.0001))
+            .map(|i| node(45.0, 6.0 + f64::from(i) * 0.0001))
             .collect(),
         arcs: (0..4)
             .flat_map(|i| [PackArc::new(i, i + 1, i + 2), PackArc::new(i + 1, i, i + 2)])
@@ -45,7 +50,10 @@ fn dijkstra_reference(graph: &GraphInput, source: u32, target: u32) -> Option<u6
 
 fn cch_cost(router: &Router, graph: &GraphInput, source: u32, target: u32) -> Option<u64> {
     router
-        .route(graph.nodes[source as usize], graph.nodes[target as usize])
+        .route(
+            graph.nodes[source as usize].coordinate(),
+            graph.nodes[target as usize].coordinate(),
+        )
         .ok()
         .map(|route| route.total_weight)
 }
@@ -77,22 +85,26 @@ fn cch_matches_dijkstra_on_weighted_grid_all_pairs() {
     };
     for y in 0..width {
         for x in 0..width {
-            let node = y * width + x;
-            graph.nodes.push(Coordinate::new(
+            let node_id = y * width + x;
+            graph.nodes.push(node(
                 45.0 + f64::from(y) * 0.0001,
                 6.0 + f64::from(x) * 0.0001,
             ));
             if x > 0 {
-                graph.arcs.push(PackArc::new(node, node - 1, 3 + node % 7));
-                graph.arcs.push(PackArc::new(node - 1, node, 2 + node % 5));
+                graph
+                    .arcs
+                    .push(PackArc::new(node_id, node_id - 1, 3 + node_id % 7));
+                graph
+                    .arcs
+                    .push(PackArc::new(node_id - 1, node_id, 2 + node_id % 5));
             }
             if y > 0 {
                 graph
                     .arcs
-                    .push(PackArc::new(node, node - width, 4 + node % 3));
+                    .push(PackArc::new(node_id, node_id - width, 4 + node_id % 3));
                 graph
                     .arcs
-                    .push(PackArc::new(node - width, node, 1 + node % 11));
+                    .push(PackArc::new(node_id - width, node_id, 1 + node_id % 11));
             }
         }
     }
@@ -102,11 +114,7 @@ fn cch_matches_dijkstra_on_weighted_grid_all_pairs() {
 #[test]
 fn shortcut_is_queried_and_unpacked_to_original_arcs() {
     let graph = GraphInput {
-        nodes: vec![
-            Coordinate::new(45.0, 6.0),
-            Coordinate::new(45.0, 6.0001),
-            Coordinate::new(45.0, 6.0002),
-        ],
+        nodes: vec![node(45.0, 6.0), node(45.0, 6.0001), node(45.0, 6.0002)],
         arcs: vec![PackArc::new(0, 1, 4), PackArc::new(1, 2, 7)],
     };
     let bytes = BuildConfig {
@@ -117,20 +125,26 @@ fn shortcut_is_queried_and_unpacked_to_original_arcs() {
     .to_pack_bytes()
     .unwrap();
     let router = Router::from_pack_bytes(&bytes).unwrap();
-    let route = router.route(graph.nodes[0], graph.nodes[2]).unwrap();
+    let route = router
+        .route(graph.nodes[0].coordinate(), graph.nodes[2].coordinate())
+        .unwrap();
     assert_eq!(route.total_weight, 11);
-    assert_eq!(route.polyline, graph.nodes);
+    assert_eq!(
+        route.geometry,
+        graph
+            .nodes
+            .iter()
+            .copied()
+            .map(RoutePoint::from)
+            .collect::<Vec<_>>()
+    );
     assert!(router.pack_stats().shortcut_witness_count > 0);
 }
 
 #[test]
 fn multi_edge_route_above_the_u32_finite_domain_is_not_no_route() {
     let graph = GraphInput {
-        nodes: vec![
-            Coordinate::new(45.0, 6.0),
-            Coordinate::new(45.0, 6.0001),
-            Coordinate::new(45.0, 6.0002),
-        ],
+        nodes: vec![node(45.0, 6.0), node(45.0, 6.0001), node(45.0, 6.0002)],
         arcs: vec![
             PackArc::new(0, 1, MAX_PACK_ARC_WEIGHT),
             PackArc::new(1, 2, 17),
@@ -146,18 +160,26 @@ fn multi_edge_route_above_the_u32_finite_domain_is_not_no_route() {
     let router = Router::from_pack_bytes(&bytes).unwrap();
 
     let route = router
-        .route(graph.nodes[0], graph.nodes[2])
+        .route(graph.nodes[0].coordinate(), graph.nodes[2].coordinate())
         .expect("a representable finite path must not be reported as NoRoute");
 
     assert_eq!(route.total_weight, u64::from(MAX_PACK_ARC_WEIGHT) + 17);
-    assert_eq!(route.polyline, graph.nodes);
+    assert_eq!(
+        route.geometry,
+        graph
+            .nodes
+            .iter()
+            .copied()
+            .map(RoutePoint::from)
+            .collect::<Vec<_>>()
+    );
 }
 
 #[test]
 fn pack_is_byte_identical_and_serializes_precomputed_cch() {
     let first = build_pack(&chain()).unwrap();
     assert_eq!(first, build_pack(&chain()).unwrap());
-    assert_eq!(&first[..5], b"CCHP1");
+    assert_eq!(&first[..5], b"CCHP2");
     let inflated = decode_all(&first[5..]).unwrap();
     let text = std::str::from_utf8(&inflated).unwrap();
     assert!(text.contains("up_first_out") && text.contains("forward_witness"));
@@ -175,7 +197,7 @@ fn corrupt_or_missing_cch_entries_are_rejected() {
     let mut value: serde_json::Value = serde_json::from_slice(&inflated).unwrap();
     value["cch"].as_object_mut().unwrap().remove("up_head");
     let encoded = encode_all(serde_json::to_vec(&value).unwrap().as_slice(), 19).unwrap();
-    let mut missing = b"CCHP1".to_vec();
+    let mut missing = b"CCHP2".to_vec();
     missing.extend(encoded);
     assert!(matches!(
         Router::from_pack_bytes(&missing),
@@ -187,7 +209,7 @@ fn corrupt_or_missing_cch_entries_are_rejected() {
 fn compressed_pack_expansion_is_bounded_before_json_parsing() {
     const LIMIT_PLUS_ONE: usize = 32 * 1024 * 1024 + 1;
     let compressed = encode_all(vec![b' '; LIMIT_PLUS_ONE].as_slice(), 1).unwrap();
-    let mut pack = b"CCHP1".to_vec();
+    let mut pack = b"CCHP2".to_vec();
     pack.extend(compressed);
 
     let error = Router::from_pack_bytes(&pack).unwrap_err();
@@ -201,10 +223,10 @@ fn compressed_pack_expansion_is_bounded_before_json_parsing() {
 fn golden_route_disconnected_and_bounds_contracts() {
     let graph = GraphInput {
         nodes: vec![
-            Coordinate::new(45.0, 6.0),
-            Coordinate::new(45.0, 6.0001),
-            Coordinate::new(45.0, 6.0002),
-            Coordinate::new(45.01, 6.01),
+            node(45.0, 6.0),
+            node(45.0, 6.0001),
+            node(45.0, 6.0002),
+            node(45.01, 6.01),
         ],
         arcs: vec![
             PackArc::new(0, 1, 10),
@@ -213,21 +235,30 @@ fn golden_route_disconnected_and_bounds_contracts() {
         ],
     };
     let router = Router::from_pack_bytes(&build_pack(&graph).unwrap()).unwrap();
-    let route = router.route(graph.nodes[0], graph.nodes[2]).unwrap();
+    let route = router
+        .route(graph.nodes[0].coordinate(), graph.nodes[2].coordinate())
+        .unwrap();
     assert_eq!(
-        (route.polyline, route.total_weight),
-        (graph.nodes[..3].to_vec(), 20)
+        (route.geometry, route.total_weight),
+        (
+            graph.nodes[..3]
+                .iter()
+                .copied()
+                .map(RoutePoint::from)
+                .collect::<Vec<_>>(),
+            20
+        )
     );
     assert!(matches!(
-        router.route(graph.nodes[0], graph.nodes[3]),
+        router.route(graph.nodes[0].coordinate(), graph.nodes[3].coordinate()),
         Err(RouterError::NoRoute)
     ));
     assert!(matches!(
-        router.route(Coordinate::new(0.0, 0.0), graph.nodes[0]),
+        router.route(Coordinate::new(0.0, 0.0), graph.nodes[0].coordinate()),
         Err(RouterError::SnapOutOfRange { .. })
     ));
     assert!(matches!(
-        router.route(Coordinate::new(91.0, 0.0), graph.nodes[0]),
+        router.route(Coordinate::new(91.0, 0.0), graph.nodes[0].coordinate()),
         Err(RouterError::InvalidCoordinate)
     ));
 }
@@ -311,11 +342,11 @@ fn full_sydney_actual_cch_pack_fits_the_public_fixture_budget() {
 #[test]
 fn pack_arc_cost_representability_limit_is_enforced() {
     let accepted = GraphInput {
-        nodes: vec![Coordinate::new(45.0, 6.0), Coordinate::new(45.0, 6.0001)],
+        nodes: vec![node(45.0, 6.0), node(45.0, 6.0001)],
         arcs: vec![PackArc::new(0, 1, MAX_PACK_ARC_WEIGHT)],
     };
     let rejected = GraphInput {
-        nodes: vec![Coordinate::new(45.0, 6.0), Coordinate::new(45.0, 6.0001)],
+        nodes: vec![node(45.0, 6.0), node(45.0, 6.0001)],
         arcs: vec![PackArc::new(0, 1, u32::MAX)],
     };
 
@@ -337,7 +368,7 @@ fn serialized_cch_cost_above_the_route_domain_is_rejected() {
     let mut value: serde_json::Value = serde_json::from_slice(&inflated).unwrap();
     value["weights"]["forward"][0] = serde_json::json!(MAX_ROUTE_WEIGHT + 1);
     let encoded = encode_all(serde_json::to_vec(&value).unwrap().as_slice(), 19).unwrap();
-    let mut corrupted = b"CCHP1".to_vec();
+    let mut corrupted = b"CCHP2".to_vec();
     corrupted.extend(encoded);
 
     assert!(matches!(
@@ -350,11 +381,16 @@ fn serialized_cch_cost_above_the_route_domain_is_rejected() {
 fn public_route_json_contains_geometry_and_cost_but_no_graph_identifiers() {
     let graph = chain();
     let router = Router::from_pack_bytes(&build_pack(&graph).unwrap()).unwrap();
-    let route = router.route(graph.nodes[0], graph.nodes[4]).unwrap();
+    let route = router
+        .route(graph.nodes[0].coordinate(), graph.nodes[4].coordinate())
+        .unwrap();
     let json = serde_json::to_value(route).unwrap();
 
-    assert!(json.get("polyline").is_some());
-    assert!(json.get("total_weight").is_some());
+    assert!(json.get("geometry").is_some());
+    assert!(json.get("totalWeight").is_some());
+    assert!(json.get("distanceM").is_some());
+    assert!(json.get("elevationGainM").is_some());
+    assert!(json.get("elevationLossM").is_some());
     assert!(json.get("node_ids").is_none());
     assert!(json.get("cch_arc_count").is_none());
     assert!(json.get("original_arc_count").is_none());
@@ -362,11 +398,7 @@ fn public_route_json_contains_geometry_and_cost_but_no_graph_identifiers() {
 
 #[test]
 fn public_api_rejects_invalid_nodes_arcs_ranks_and_snap_configuration() {
-    for coordinate in [
-        Coordinate::new(f64::NAN, 0.0),
-        Coordinate::new(91.0, 0.0),
-        Coordinate::new(0.0, -181.0),
-    ] {
+    for coordinate in [node(f64::NAN, 0.0), node(91.0, 0.0), node(0.0, -181.0)] {
         assert!(matches!(
             build_pack(&GraphInput {
                 nodes: vec![coordinate],
@@ -383,7 +415,7 @@ fn public_api_rejects_invalid_nodes_arcs_ranks_and_snap_configuration() {
         Err(RouterError::InvalidPack(_))
     ));
 
-    let nodes = vec![Coordinate::new(45.0, 6.0), Coordinate::new(45.0, 6.0001)];
+    let nodes = vec![node(45.0, 6.0), node(45.0, 6.0001)];
     for arc in [
         PackArc::new(0, 0, 1),
         PackArc::new(0, 1, 0),
@@ -440,7 +472,7 @@ fn path_loader_stats_and_benchmark_corpus_have_stable_contracts() {
     assert!(report.p95_micros <= report.p99_micros);
     assert!(report.p99_micros <= report.max_micros);
 
-    let requests = [(chain().nodes[0], chain().nodes[4])];
+    let requests = [(chain().nodes[0].coordinate(), chain().nodes[4].coordinate())];
     let corpus = cch_routing_lite::BenchCorpus::from_routes(&router, &requests).unwrap();
     assert_eq!(corpus.routes.len(), 1);
     assert!(corpus.to_json().unwrap().is_object());
@@ -480,7 +512,7 @@ fn semantically_corrupt_weights_and_witnesses_are_rejected() {
         let mut changed = value.clone();
         corrupt(&mut changed);
         let encoded = encode_all(serde_json::to_vec(&changed).unwrap().as_slice(), 19).unwrap();
-        let mut pack = b"CCHP1".to_vec();
+        let mut pack = b"CCHP2".to_vec();
         pack.extend(encoded);
         assert!(matches!(
             Router::from_pack_bytes(&pack),
@@ -497,7 +529,7 @@ proptest! {
     ) {
         let mut graph = GraphInput {
             nodes: (0..node_count)
-                .map(|node| Coordinate::new(-33.87 + node as f64 * 0.0001, 151.20 + node as f64 * 0.00007))
+                .map(|index| node(-33.87 + index as f64 * 0.0001, 151.20 + index as f64 * 0.00007))
                 .collect(),
             arcs: Vec::new(),
         };

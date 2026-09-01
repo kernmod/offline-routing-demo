@@ -24,6 +24,38 @@ attribution asset has a size and SHA-256 digest in
 `manifest.json`. The repository's software licence does not replace the data
 licence.
 
+## Public elevation snapshot
+
+Elevation is derived from six checked-in Mapzen Terrain Tiles covering the
+fixture bounds at zoom 15. The tiles are distributed through the AWS Open Data
+Registry dataset `elevation-tiles-prod`; for Australia the upstream attribution
+is `© Commonwealth of Australia (Geoscience Australia) 2017`. Exact source
+URLs, byte sizes, SHA-256 digests, capture date, and attribution links are
+pinned in `fixtures/sydney/dem/source.json`.
+
+Tilezen identifies Geoscience Australia as the Australian component. The
+corresponding GA SRTM 1-second DEM metadata publishes that component under
+[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) and provides the
+recommended citation; both are pinned beside the Tilezen composite attribution.
+
+The source PNGs use the documented Terrarium encoding:
+
+```text
+elevation metres = red × 256 + green + blue ÷ 256 − 32768
+```
+
+The fixture builder decodes the PNGs locally, bilinearly samples the DEM at
+each graph node, and rounds elevations to integer metres. The vertical datum is
+source-dependent, so this demo treats the values as terrain-profile estimates,
+not survey-grade heights. Elevation does not alter routing weights or introduce
+a private cost profile; it is only attached to route geometry for display and
+for deterministic D+/D− arithmetic.
+
+`make fixture` never uses the network. Maintainers may deliberately refresh the
+pinned elevation inputs with `node tools/fixtures/fetch-dem.mjs`; that command
+refuses any response whose size or digest differs from `source.json`, so a
+source update requires an explicit review of the provenance lock first.
+
 ## Deterministic transformation
 
 The build performs the following local transformations:
@@ -33,18 +65,21 @@ The build performs the following local transformations:
 2. keep walkable highway pairs inside the declared bounds, reject private or
    explicitly non-pedestrian ways, select the largest connected component, and
    emit stable node indices plus symmetric directed arcs;
-3. compute each arc weight as the rounded haversine distance in metres;
-4. encode label-free `roads` vector tiles for zooms 13–16 into a PMTiles v3
+3. sample the checked-in Terrarium DEM and attach integer `elevationM` values
+   to nodes without changing arc weights;
+4. compute each arc weight as the rounded haversine distance in metres;
+5. encode label-free `roads` vector tiles for zooms 13–16 into a PMTiles v3
    archive;
-5. compile the graph with the public `cch-routing-lite build-pack` binary;
-6. regenerate the manifest from the resulting bytes.
+6. compile the graph with the public `cch-routing-lite build-pack` binary into
+   the versioned `CCHP2` format;
+7. regenerate the manifest from the resulting bytes.
 
 `graph.json` intentionally has the exact public builder schema, with no hidden
 metadata:
 
 ```json
 {
-  "nodes": [{ "lat": -33.867, "lng": 151.21 }],
+  "nodes": [{ "lat": -33.867, "lng": 151.21, "elevationM": 18 }],
   "arcs": [{ "from": 0, "to": 1, "weight": 42 }]
 }
 ```
@@ -68,17 +103,10 @@ independent routing packs, and compares every file byte-for-byte. It also
 checks bounds, checksums, archive offsets, metadata, tile type, zooms, licence,
 asset budget, and routing status.
 
-Current checked-in runtime assets total 3,521,789 bytes. With the 760-byte
-human-readable attribution notice, the manifest covers 3,522,549 bytes, below
-the 5 MB budget:
-
-| Asset | Bytes |
-| --- | ---: |
-| `source.osm.json` | 1,545,438 |
-| `graph.json` | 840,023 |
-| `map.pmtiles` | 680,630 |
-| `routing.pack` | 454,271 |
-| style + glyph range | 1,427 |
+The current byte sizes and digests are generated in `manifest.json`; verification
+enforces a five-megabyte total fixture budget, including the DEM snapshot and
+human-readable attribution. This avoids duplicating numbers that can become
+stale after a deliberate source refresh.
 
 For an independent compatibility check, PMTiles JavaScript 4.5.0 reads the
 header, metadata, and a centre tile; `@mapbox/vector-tile` 2.0.4 decodes that

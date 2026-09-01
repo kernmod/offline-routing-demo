@@ -12,3 +12,24 @@ The normalized source is checked into the repository. Building the runtime
 assets from that file performs no network request. The basemap intentionally
 contains no labels, so the local glyph template is never requested by the
 style; an empty font range is included to keep all style URLs local.
+
+## Elevation
+
+Elevation is derived from the public **Terrain Tiles** dataset managed by
+Mapzen/Tilezen and distributed through the AWS Open Data bucket
+`elevation-tiles-prod`. The six checked-in zoom-15 PNGs use the documented
+Terrarium encoding. Their URLs, byte sizes and SHA-256 digests are pinned in
+`dem/source.json`, so the regular fixture build makes no network request.
+
+Terrain data processed by Mapzen/Tilezen; Australia terrain data © Commonwealth of Australia (Geoscience Australia) 2017.
+
+The Australian elevation component is published under
+[CC-BY-4.0](https://creativecommons.org/licenses/by/4.0/). Product metadata and the
+recommended citation are pinned in `dem/source.json`; the Tilezen composite
+attribution remains mandatory.
+
+The upstream mosaic combines public terrain sources and does not expose one
+survey-grade vertical datum for every output pixel. This demo therefore labels
+the profile as derived terrain elevation and does not use it to alter routing
+costs. See the [Terrarium format](https://github.com/tilezen/joerd/blob/master/docs/formats.md) and
+[upstream attribution requirements](https://github.com/tilezen/joerd/blob/master/docs/attribution.md).

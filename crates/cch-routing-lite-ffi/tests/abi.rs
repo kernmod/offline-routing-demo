@@ -1,16 +1,24 @@
-use cch_routing_lite::{BuildConfig, Coordinate, PackArc};
+use cch_routing_lite::{BuildConfig, GraphNode, PackArc};
 use cch_routing_lite_ffi::{
     routing_buffer_free, routing_router_benchmark, routing_router_free, routing_router_load,
-    routing_router_route, RoutingBuffer, RoutingCoordinate, ROUTING_ERR_BAD_PACK,
-    ROUTING_ERR_INVALID_ARGUMENT, ROUTING_ERR_ROUTE, ROUTING_OK,
+    routing_router_route, routing_router_route_many, RoutingBuffer, RoutingCoordinate,
+    ROUTING_ERR_BAD_PACK, ROUTING_ERR_INVALID_ARGUMENT, ROUTING_ERR_ROUTE, ROUTING_OK,
 };
 use std::sync::{Arc, Barrier};
 
+fn node(lat: f64, lng: f64) -> GraphNode {
+    GraphNode::new(lat, lng, 0)
+}
+
 fn pack() -> Vec<u8> {
     BuildConfig {
-        nodes: vec![Coordinate::new(45.0, 6.0), Coordinate::new(45.0, 6.001)],
-        arcs: vec![PackArc::new(0, 1, 7)],
-        ranks: vec![0, 1],
+        nodes: vec![node(45.0, 6.0), node(45.0, 6.001), node(45.0, 6.002)],
+        arcs: vec![
+            PackArc::new(0, 1, 7),
+            PackArc::new(1, 0, 9),
+            PackArc::new(1, 2, 11),
+        ],
+        ranks: vec![0, 1, 2],
     }
     .to_pack_bytes()
     .unwrap()
@@ -279,6 +287,80 @@ fn benchmark_rejects_null_stale_and_null_output_handles() {
     assert_eq!(
         unsafe { routing_router_benchmark(router, std::ptr::null_mut()) },
         ROUTING_ERR_INVALID_ARGUMENT,
+    );
+    routing_router_free(router);
+}
+
+#[test]
+fn route_many_accepts_a_borrowed_coordinate_array_and_returns_owned_json() {
+    let pack = pack();
+    let router = unsafe { routing_router_load(pack.as_ptr(), pack.len()) };
+    let controls = [
+        RoutingCoordinate {
+            lat: 45.0,
+            lng: 6.0,
+        },
+        RoutingCoordinate {
+            lat: 45.0,
+            lng: 6.001,
+        },
+        RoutingCoordinate {
+            lat: 45.0,
+            lng: 6.002,
+        },
+    ];
+    let mut buffer = RoutingBuffer::default();
+
+    let status = unsafe {
+        routing_router_route_many(
+            router,
+            controls.as_ptr(),
+            controls.len(),
+            false,
+            &mut buffer,
+        )
+    };
+
+    assert_eq!(status, ROUTING_OK);
+    let bytes = unsafe { std::slice::from_raw_parts(buffer.ptr, buffer.len) };
+    let value: serde_json::Value = serde_json::from_slice(bytes).unwrap();
+    assert_eq!(value["controlCount"], 3);
+    assert_eq!(value["legs"].as_array().unwrap().len(), 2);
+    unsafe { routing_buffer_free(&mut buffer) };
+    routing_router_free(router);
+}
+
+#[test]
+fn route_many_rejects_null_arrays_bad_counts_and_nonempty_outputs() {
+    let pack = pack();
+    let router = unsafe { routing_router_load(pack.as_ptr(), pack.len()) };
+    let controls = [RoutingCoordinate {
+        lat: 45.0,
+        lng: 6.0,
+    }; 17];
+    let mut buffer = RoutingBuffer::default();
+
+    assert_eq!(
+        unsafe { routing_router_route_many(router, std::ptr::null(), 2, false, &mut buffer) },
+        ROUTING_ERR_INVALID_ARGUMENT
+    );
+    assert_eq!(
+        unsafe { routing_router_route_many(router, controls.as_ptr(), 1, false, &mut buffer) },
+        ROUTING_ERR_INVALID_ARGUMENT
+    );
+    assert_eq!(
+        unsafe { routing_router_route_many(router, controls.as_ptr(), 17, false, &mut buffer) },
+        ROUTING_ERR_INVALID_ARGUMENT
+    );
+
+    let mut nonempty = RoutingBuffer {
+        ptr: std::ptr::dangling_mut(),
+        len: 1,
+        cap: 1,
+    };
+    assert_eq!(
+        unsafe { routing_router_route_many(router, controls.as_ptr(), 2, false, &mut nonempty) },
+        ROUTING_ERR_INVALID_ARGUMENT
     );
     routing_router_free(router);
 }

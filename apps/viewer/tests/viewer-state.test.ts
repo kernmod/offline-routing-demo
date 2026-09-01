@@ -69,4 +69,15 @@ describe("viewer state machine", () => {
     );
     expect(viewerCopy(ready).detail).toBe("2 seeded references · 2 live publications");
   });
+
+  it("upserts and selects a publication returned by the live API", () => {
+    const state = nextViewerState(initialViewerState(), {
+      type: "published",
+      segment: { id: "new", isSeed: false, distanceM: 42, pointCount: 2, encodedGeometry: "x" }
+    });
+
+    expect(state.segments.map((segment) => segment.id)).toEqual(["new"]);
+    expect(state.selectedId).toBe("new");
+    expect(state.data).toBe("ready");
+  });
 });

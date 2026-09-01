@@ -53,6 +53,10 @@ preBuild.dependsOn(tasks.named("buildRustJniLibs"))
 tasks.matching { it.name.startsWith("buildCMakeRelWithDebInfo") }.configureEach { task ->
   def configureTaskName = task.name.replaceFirst("buildCMakeRelWithDebInfo", "configureCMakeRelWithDebInfo")
   dependsOn(tasks.named(configureTaskName))
+  dependsOn(tasks.named("buildRustJniLibs"))
+}
+tasks.matching { it.name.startsWith("configureCMakeRelWithDebInfo") }.configureEach {
+  dependsOn(tasks.named("buildRustJniLibs"))
 }
 if (isNewArchitectureEnabled()) {
   react {

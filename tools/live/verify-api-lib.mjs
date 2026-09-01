@@ -6,19 +6,26 @@ const DEFAULT_TIMEOUT_MS = 8_000;
 const DEFAULT_MAX_RESPONSE_BYTES = 64 * 1024;
 const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const SYDNEY_GEOMETRY = Object.freeze([
-  Object.freeze({ lat: -33.8688, lng: 151.2093 }),
-  Object.freeze({ lat: -33.8695, lng: 151.2102 }),
-  Object.freeze({ lat: -33.8701, lng: 151.2111 })
+  Object.freeze({ lat: -33.8688, lng: 151.2093, elevationM: 10 }),
+  Object.freeze({ lat: -33.8695, lng: 151.2102, elevationM: 15 }),
+  Object.freeze({ lat: -33.8701, lng: 151.2111, elevationM: 12 })
 ]);
 const SYDNEY_BBOX = "-33.871,151.208,-33.868,151.212";
 const SEGMENT_KEYS = [
   "bbox",
+  "controlPoints",
   "createdAt",
   "distanceM",
+  "elevationGainM",
+  "elevationLossM",
+  "elevationsM",
   "encodedGeometry",
   "expiresAt",
   "id",
   "isSeed",
+  "metricsVersion",
+  "name",
+  "publicationState",
   "pointCount"
 ].sort();
 
@@ -253,6 +260,34 @@ function assertSegmentRecord(value, label, { published = false } = {}) {
   }
   assertPositiveInteger(value.pointCount, label);
   assertPositiveInteger(value.distanceM, label);
+  if (typeof value.name !== "string" || value.name.length < 1 || value.name.length > 80) {
+    fail(`${label} response contract is invalid`);
+  }
+  if (value.publicationState !== "published") fail(`${label} response contract is invalid`);
+  if (value.metricsVersion !== 1 && value.metricsVersion !== 2) fail(`${label} response contract is invalid`);
+  if (
+    !Array.isArray(value.controlPoints) ||
+    value.controlPoints.length < 2 ||
+    value.controlPoints.some((point) => !Number.isSafeInteger(point) || point < 0 || point >= value.pointCount) ||
+    value.controlPoints[0] !== 0 ||
+    value.controlPoints.at(-1) !== value.pointCount - 1 ||
+    value.controlPoints.some((point, index) => index > 0 && point <= value.controlPoints[index - 1])
+  ) {
+    fail(`${label} response contract is invalid`);
+  }
+  if (value.metricsVersion === 1) {
+    if (value.elevationsM !== null || value.elevationGainM !== null || value.elevationLossM !== null) {
+      fail(`${label} response contract is invalid`);
+    }
+  } else if (
+    !Array.isArray(value.elevationsM) ||
+    value.elevationsM.length !== value.pointCount ||
+    value.elevationsM.some((elevation) => typeof elevation !== "number" || !Number.isFinite(elevation)) ||
+    !Number.isSafeInteger(value.elevationGainM) || value.elevationGainM < 0 ||
+    !Number.isSafeInteger(value.elevationLossM) || value.elevationLossM < 0
+  ) {
+    fail(`${label} response contract is invalid`);
+  }
   assertBbox(value.bbox, label);
   const createdAt = assertIsoTimestamp(value.createdAt, label);
   if (typeof value.isSeed !== "boolean") fail(`${label} response contract is invalid`);
@@ -263,7 +298,18 @@ function assertSegmentRecord(value, label, { published = false } = {}) {
     if (expiresAt <= createdAt) fail(`${label} response contract is invalid`);
   }
   if (published) {
-    if (value.isSeed || value.pointCount !== SYDNEY_GEOMETRY.length || value.expiresAt === null) {
+    if (
+      value.isSeed ||
+      value.name !== "Sydney verifier route" ||
+      value.metricsVersion !== 2 ||
+      value.pointCount !== SYDNEY_GEOMETRY.length ||
+      value.distanceM !== 221 ||
+      value.elevationGainM !== 5 ||
+      value.elevationLossM !== 3 ||
+      !isDeepStrictEqual(value.elevationsM, [10, 15, 12]) ||
+      !isDeepStrictEqual(value.controlPoints, [0, 2]) ||
+      value.expiresAt === null
+    ) {
       fail(`${label} response contract is invalid`);
     }
     const expected = {
@@ -406,16 +452,21 @@ export async function verifyLiveApi({
 
   const idempotencyKey = randomUUID();
   if (!UUID_V4.test(idempotencyKey)) fail("secure UUID generator returned an invalid UUIDv4");
+  const publishBody = {
+    name: "Sydney verifier route",
+    geometry: SYDNEY_GEOMETRY,
+    controlPoints: [0, SYDNEY_GEOMETRY.length - 1]
+  };
   const published = await requestJson({
     fetchImpl,
-    url: `${apiOrigin}/segments`,
+    url: `${apiOrigin}/v2/segments`,
     init: {
       method: "POST",
       headers: headers({
         "content-type": "application/json",
         "idempotency-key": idempotencyKey
       }),
-      body: JSON.stringify({ geometry: SYDNEY_GEOMETRY })
+      body: JSON.stringify(publishBody)
     },
     label: "publish",
     allowedStatuses: [200, 201],
@@ -424,7 +475,48 @@ export async function verifyLiveApi({
   });
   assertSegmentRecord(published.payload, "publish", { published: true });
 
-  const nearbyUrl = new URL(`${apiOrigin}/segments`);
+  const replay = await requestJson({
+    fetchImpl,
+    url: `${apiOrigin}/v2/segments`,
+    init: {
+      method: "POST",
+      headers: headers({
+        "content-type": "application/json",
+        "idempotency-key": idempotencyKey
+      }),
+      body: JSON.stringify(publishBody)
+    },
+    label: "replay",
+    allowedStatuses: [200],
+    timeoutMs,
+    maxResponseBytes
+  });
+  assertSegmentRecord(replay.payload, "replay", { published: true });
+  if (!isDeepStrictEqual(replay.payload, published.payload)) {
+    fail("idempotent replay did not return the published segment unchanged");
+  }
+
+  const conflict = await requestJson({
+    fetchImpl,
+    url: `${apiOrigin}/v2/segments`,
+    init: {
+      method: "POST",
+      headers: headers({
+        "content-type": "application/json",
+        "idempotency-key": idempotencyKey
+      }),
+      body: JSON.stringify({ ...publishBody, name: "Sydney verifier route conflict probe" })
+    },
+    label: "conflict",
+    allowedStatuses: [409],
+    timeoutMs,
+    maxResponseBytes
+  });
+  if (!hasExactKeys(conflict.payload, ["error"]) || conflict.payload.error !== "idempotency_conflict") {
+    fail("conflict response contract is invalid");
+  }
+
+  const nearbyUrl = new URL(`${apiOrigin}/v2/segments`);
   nearbyUrl.searchParams.set("bbox", SYDNEY_BBOX);
   const nearby = await requestJson({
     fetchImpl,
@@ -449,6 +541,12 @@ export async function verifyLiveApi({
   return {
     apiOrigin,
     segmentId: published.payload.id,
-    statuses: { health: health.status, publish: published.status, nearby: nearby.status }
+    statuses: {
+      health: health.status,
+      publish: published.status,
+      replay: replay.status,
+      conflict: conflict.status,
+      nearby: nearby.status
+    }
   };
 }

@@ -2,6 +2,7 @@
 #define CCH_ROUTING_LITE_H
 
 #include <stddef.h>
+#include <stdbool.h>
 #include <stdint.h>
 
 #ifdef __cplusplus
@@ -38,6 +39,12 @@ int32_t routing_router_route(const RoutingHandle *router,
                              RoutingCoordinate origin,
                              RoutingCoordinate destination,
                              RoutingBuffer *out_buffer);
+
+int32_t routing_router_route_many(const RoutingHandle *router,
+                                  const RoutingCoordinate *controls_ptr,
+                                  size_t control_count,
+                                  bool closed_loop,
+                                  RoutingBuffer *out_buffer);
 
 int32_t routing_router_benchmark(const RoutingHandle *router,
                                  RoutingBuffer *out_buffer);

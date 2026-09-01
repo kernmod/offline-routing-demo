@@ -16,25 +16,66 @@ test("mobile is pinned to Expo 54, RN 0.81 and MapLibre RN v11", () => {
 
 test("the screen uses MapLibre data sources and has no rectangle-map or JS routing fallback", () => {
   const source = read("App.tsx");
-  assert.match(source, /MapView/);
+  const viewModel = read("src/studioViewModel.ts");
+  assert.match(source, /Map as MapView/);
+  assert.match(source, /<MapView/);
   assert.match(source, /GeoJSONSource/);
   assert.match(source, /<Layer/);
   assert.match(source, /data=\{routeFeature as never\}/);
-  assert.match(source, /FeatureCollection/);
+  assert.match(viewModel, /FeatureCollection/);
   assert.doesNotMatch(source, /routeSegments|projectPoint|unprojectPress|createFixtureRouter|shortestPath/);
+});
+
+test("route studio exposes multipoint editing, elevation trim, draft lifecycle and confirmed v2 publication", () => {
+  const screen = read("App.tsx");
+  const controller = read("app.js");
+  const controls = read("src/components/StudioControls.tsx");
+  assert.match(screen, /control-point-source/);
+  assert.match(screen, /selected-route-source/);
+  assert.match(screen, /ElevationProfile/);
+  assert.match(screen, /PublishConfirmation/);
+  assert.match(controls, /Undo/);
+  assert.match(controls, /Redo/);
+  assert.match(controls, /Close loop/);
+  assert.match(controls, /Move/);
+  assert.match(controls, /Delete/);
+  assert.match(controls, /Start handle/);
+  assert.match(controls, /End handle/);
+  assert.match(controller, /buildPublishPayload/);
+  assert.match(controller, /pendingPublishKey/);
+  assert.match(controller, /publishStatus: "confirming"/);
+  assert.match(controller, /publishStatus: "publishing"/);
+  assert.match(controller, /publishStatus: "published"/);
+  assert.match(controller, /publishStatus: "failed"/);
+  assert.match(read("src/networkApi.ts"), /\/v2\/segments/);
+  assert.match(read("src/networkApi.ts"), /idempotency-key/);
+});
+
+test("private drafts persist only in the application document sandbox", () => {
+  const source = read("src/mobileDraftStore.ts");
+  assert.match(source, /documentDirectory/);
+  assert.match(source, /createDraftStore/);
+  assert.doesNotMatch(source, /fetch\(|https?:\/\//);
 });
 
 test("offline assets and styles contain no remote URL or CDN fallback", () => {
   const manifest = read("assets/fixture-manifest.json");
   const style = read("assets/style.json");
   const metro = read("metro.config.cjs");
-  assert.match(manifest, /tiles\.pmtiles/);
+  assert.match(manifest, /map\.pmtiles/);
   assert.match(manifest, /routing\.pack/);
   assert.match(style, /127\.0\.0\.1/);
-  assert.doesNotMatch(`${manifest}\n${style}`.replaceAll("http://127.0.0.1", ""), /https?:\/\//i);
-  assert.doesNotMatch(`${manifest}\n${style}`, /cdn|r2|cloudflare/i);
+  assert.doesNotMatch(style.replaceAll("http://127.0.0.1", ""), /https?:\/\//i);
+  assert.doesNotMatch(style, /cdn|r2|cloudflare/i);
   assert.match(metro, /assetExts\.push\('pmtiles', 'pack', 'mapstyle'\)/);
   assert.match(read("src/offlineBoot.ts"), /style\.mapstyle/);
+  assert.match(manifest, /"schema_version": 2/);
+  assert.match(manifest, /"pack_schema": "CCHP2"/);
+  assert.match(manifest, /"elevation"/);
+  const preparation = read("scripts/prepareAssets.mjs");
+  assert.match(preparation, /fixtures\/sydney\/manifest\.json/);
+  assert.match(preparation, /fixtures\/sydney\/routing\.pack/);
+  assert.match(preparation, /fixtures\/sydney\/map\.pmtiles/);
 });
 
 test("network capability is quarantined behind the explicit publish and refresh actions", () => {
@@ -147,6 +188,7 @@ test("android config blocks legacy storage permissions while keeping network acc
   assert.match(networkSecurity, /cleartextTrafficPermitted="false"/);
   assert.match(networkSecurity, /cleartextTrafficPermitted="true"/);
   assert.match(networkSecurity, /127\.0\.0\.1/);
+  assert.match(networkSecurity, />localhost</);
 });
 
 test("benchmark and route evidence stay observable through public app logs", () => {

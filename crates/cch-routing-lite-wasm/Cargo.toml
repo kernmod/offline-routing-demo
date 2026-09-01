@@ -1,0 +1,14 @@
+[package]
+name = "cch-routing-lite-wasm"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+cch-routing-lite = { path = "../cch-routing-lite" }
+serde.workspace = true
+serde_json.workspace = true
+wasm-bindgen = "0.2"

@@ -7,6 +7,7 @@ import {
   decodePolyline6,
   encodePolyline6,
   lonLatToTilePoint,
+  routeElevationMetrics,
   routeMetrics,
   segmentCells,
   tileKey,
@@ -116,6 +117,31 @@ test("routeMetrics returns rounded distance and point count", () => {
     maxLat: -33.8688,
     maxLng: 151.2111
   });
+});
+
+test("routeElevationMetrics derives deterministic gain and loss from the final profile", () => {
+  const metrics = routeElevationMetrics([
+    { lat: -33.8688, lng: 151.2093, elevationM: 10 },
+    { lat: -33.8695, lng: 151.2102, elevationM: 15.4 },
+    { lat: -33.8701, lng: 151.2111, elevationM: 12.2 },
+    { lat: -33.8702, lng: 151.2112, elevationM: 13 }
+  ]);
+
+  assert.equal(metrics.elevationGainM, 6);
+  assert.equal(metrics.elevationLossM, 3);
+  assert.equal(metrics.pointCount, 4);
+  assert.equal(metrics.distanceM > 0, true);
+});
+
+test("routeElevationMetrics rejects missing and non-finite elevations", () => {
+  assert.throws(
+    () => routeElevationMetrics([{ lat: -33.8688, lng: 151.2093 }]),
+    /elevationM/
+  );
+  assert.throws(
+    () => routeElevationMetrics([{ lat: -33.8688, lng: 151.2093, elevationM: Infinity }]),
+    /elevationM/
+  );
 });
 
 test("polyline6 round-trips Sydney points exactly at 1e-6 precision", () => {

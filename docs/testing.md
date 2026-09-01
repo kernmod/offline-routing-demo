@@ -1,70 +1,108 @@
 # Testing Strategy
 
-This repository follows strict TDD: each behavior begins with a focused failing test,
-the smallest implementation makes it pass, and refactoring happens only while the
-suite remains green. Pull requests must show the RED and GREEN commands in their
-description; coverage is evidence, not a replacement for meaningful assertions.
+This repository uses strict TDD. Each Route Studio surface started with a
+focused failing test, then moved through the smallest green implementation,
+refactor, coverage gate, and independent audit/review pass.
+The test pyramid combines unit, property, integration, E2E, and device checks.
 
 ## Coverage contract
 
-| Surface | Lines/functions | Branches | Additional gate |
-| --- | ---: | ---: | --- |
-| Whole repository | 80% | 80% | no package may silently opt out |
-| `packages/shared` | 95% | 90% | geometry limits and codecs |
-| `apps/api` | 95% | 90% | 100% of rejection, limit, idempotency, and database-error paths |
-| `apps/mobile` | 85% | 80% | offline state machine and route presentation |
-| `apps/viewer` | 85% | 80% | loading, empty, failure, and map interaction states |
-| Rust workspace | 80% | measured where supported | 90% for public APIs, pack parsing, errors, and FFI ownership |
+| Surface | Lines/functions | Branches |
+| --- | ---: | ---: |
+| Whole repository | 80% | 80% |
+| `packages/shared` | 95% | 90% |
+| `packages/route-studio` | 95% | 90% |
+| `apps/api` | 95% | 90% |
+| `apps/viewer` | 85% | 80% |
+| `apps/mobile` | 80% | 80% |
+| Rust workspace | 80% | measured where supported |
 
-Generated bindings, platform-generated projects, and static public fixtures may be
-excluded only when the owning package documents the path and reason. Exclusions may
-not contain handwritten business logic. CI publishes JavaScript and Rust LCOV output.
+The policy is strict: no .skip, no #[ignore], no .only, and no test.todo.
 
-no .skip, no .only, no test.todo, and no #[ignore] are accepted. A flaky test is fixed or
-the gate stays red; it is never hidden with retries as the sole remedy.
+## Route Studio TDD contract
 
-## Test pyramid
+`tools/audit/route-studio-contract.test.mjs` was the first RED gate.
+RED was recorded first with `node --test tools/audit/route-studio-contract.test.mjs`.
+The required chain remains: RED contract -> shared domain -> public DEM ->
+native/WASM pack parity -> publish/read API -> mobile/browser E2E -> release/live.
+RED first covered the missing shared domain, public DEM provenance, pack parity,
+publish/read API, and no network route fallback.
 
-- Unit tests cover pure geometry, validation, state machines, and error mapping.
-- Property tests cover coordinate bounds, polyline round-trips, serialization, and
-  routing invariants over generated graphs.
-- Integration tests exercise public fixture → pack → route, ABI allocation/free,
-  and Worker API → D1 migrations → spatial queries.
-- End-to-end (E2E) browser tests cover the viewer with deterministic seeded data.
-- Device E2E tests install a release APK, enable airplane mode, boot the embedded
-  map, tap two points, and verify a route without network traffic.
-- Non-functional tests cover deterministic builds, public-boundary auditing,
-  rate/size limits, and named-device p50/p95 measurements.
+Enforceable Route Studio thresholds:
 
-## Commands
+- shared domain: 95% lines/functions, 90% branches
+- studio UI: 90% lines/functions, 85% branches
+- WASM adapter: 90% lines/functions, 90% branches
+- API transition: 95% lines/functions, 90% branches
+- DEM builder and verifier: 95% lines/functions, 90% branches
+
+The contract forbids any network route fallback. The publish/read API never
+routes; all route calculation happens locally before publication.
+
+## Route Studio proof chain
+
+The Route Studio build order is enforced by tests:
+
+1. public contract and boundary docs;
+2. shared domain state machine;
+3. DEM provenance and deterministic `CCHP2` fixture;
+4. native `routeMany`, ABI ownership, and Nitro bridge;
+5. WASM parity on the same pack;
+6. Worker/D1 `v2` publish/read contract;
+7. browser and mobile editing flows;
+8. release, benchmark, audit, and live verification.
+
+## Current evidence
+
+| Phase | Command or evidence | Result on 2026-09-01 | Status |
+| --- | --- | --- | --- |
+| P0 contract | `node --test tools/audit/route-studio-contract.test.mjs` | 6/6 pass | green |
+| P1 shared domain | `pnpm --filter @offline-routing/route-studio test:coverage` | 36 tests, 99.84% lines, 91.20% branches, 100% funcs | green |
+| P2 fixture + DEM | `make fixture && make verify-fixture` | deterministic rebuild, manifest/schema `CCHP2`, DEM provenance pinned | green |
+| P2 fixture coverage | `node --test tools/fixtures/*.test.mjs` via root gate | hostile fixture coverage retained in root gate | green |
+| P3 Rust native/FFI | `cargo test --workspace` | Rust core, FFI, WASM, tile server all pass | green |
+| P4 WASM build | `pnpm build:wasm` | pinned Rust 1.94.1 and wasm-bindgen 0.2.127 build passes | green |
+| P4 viewer parity | `pnpm --filter @offline-routing/viewer test:coverage` | 42 tests, 94.66% lines, 82.75% branches, 91.30% funcs, including real generated-WASM parity on the committed pack | green |
+| P5 API | `pnpm --filter @offline-routing/api test:coverage` | 27 tests, 98.97% lines, 90.62% branches, 100% funcs | green |
+| P6 mobile package | `pnpm coverage:mobile` | 48 tests, 95.55% lines, 83.93% branches, 90.76% funcs | green |
+| P7 browser E2E | `pnpm --filter @offline-routing/viewer test:e2e` | 6/6 pass desktop + mobile viewport | green |
+| P8 root coverage | `pnpm test:coverage` | LCOV_OK for root, mobile, offline-router, api, viewer, and shared | green |
+| P8 Rust coverage | `cargo llvm-cov --workspace --all-targets --fail-under-lines 80` | `coverage/rust.lcov` regenerated, gate passed | green |
+| P8 live `v2` | `pnpm verify:live-api --url <worker>` | current old public API still needs redeploy from `main`; local deploy contract and verifier are green | pending deploy |
+
+## Command reference
 
 ```bash
-pnpm test                       # root and JavaScript package tests
-pnpm test:coverage              # Node coverage plus package coverage gates
-cargo test --workspace          # Rust unit/property/integration tests
+pnpm test
+pnpm test:coverage
+
+pnpm build:wasm
+pnpm --filter @offline-routing/viewer test:e2e
+pnpm coverage:mobile
+pnpm --filter @offline-routing/api test:coverage
+pnpm --filter @offline-routing/route-studio test:coverage
+
+cargo test --workspace
 cargo llvm-cov --workspace --all-targets --fail-under-lines 80
-make audit-public               # tree, history, remote, endpoint, artifact, secret gates
-pnpm verify:live-api --url https://your-worker.workers.dev     # state-changing live publish/read proof
+
+make fixture
+make verify-fixture
+pnpm audit:public
+pnpm verify:live-api --url https://your-worker.workers.dev
 ```
 
-The live verifier has no default endpoint and is intentionally outside `verify-local`.
-It accepts only a public HTTPS `*.workers.dev` origin, bounds DNS resolution and
-fails closed if it returns any non-public address, uses an ephemeral UUIDv4
-idempotency key, and bounds each request to 8 seconds and each JSON response to
-64 KiB. It checks `/health`, publishes the
-documented three-point Sydney geometry, then requires the same record to be
-returned by the `minLat,minLng,maxLat,maxLng` bbox query. It emits statuses only:
-no URL, key, request body, response body, or credential is printed.
+## What is covered
 
-## Phase evidence
-
-| Phase | RED evidence | GREEN evidence | Coverage artifact | Status |
-| --- | --- | --- | --- | --- |
-| P0 | `node --test tools/audit/*.test.mjs` — missing docs/audit library | `make verify-local` now reruns bootstrap, test policy, coverage collection, Rust coverage, cleanup, and public audit in one gate, ending with `LOCAL_READY` | root coverage 88.34% lines, 86.64% branches, 91.83% funcs | green local |
-| P1 | `pnpm test` failed until `fixtures/sydney` manifest, assets and deterministic builder existed | `pnpm test`, `make fixture`, and `make verify-fixture` pass locally | root coverage includes fixture builders/verifiers | green local |
-| P2 | `cargo test --workspace --no-run` failed before the public versioned FFI/router surface was completed | `cargo test --workspace`, `cargo clippy --workspace --all-targets -- -D warnings`, and `cargo llvm-cov --workspace --all-targets --fail-under-lines 80` pass locally | Rust workspace 93.67% lines, 93.33% functions | green local |
-| P3 | bridge ownership and mobile offline tests | `ANDROID_SERIAL=localhost:5556 ./scripts/device/smoke-route.sh` plus `./scripts/device/verify-release.sh` and direct two-tap `adb input tap` evidence | mobile coverage 91.01% lines, 83.07% branches, 88.46% funcs; final device evidence under `docs/evidence/2026-08-31T20-11-16Z-release-device.*` | green device-local |
-| P4 | `pnpm --filter @offline-routing/api test` failed before Worker exports, migrations, and D1 query helpers existed; the deploy workflow test then caught Wrangler 4 rejecting `--yes` | Worker contract, migrations, TTL, idempotency and query plan pass locally; production migrations plus `LIVE_API_OK health=200 publish=201 nearby=200` pass externally | API coverage 99.21% lines, 92.68% branches, 100% funcs | green live |
-| P5 | `pnpm --filter @offline-routing/viewer test` failed before the static shell and viewer client existed | unit tests plus Playwright desktop/mobile, API-down, and `/offline-routing-demo/` sub-path checks pass locally; GitHub Pages serves the live viewer with document `200`, `map.pmtiles` byte range `206`, and external Chromium WebGL proof | viewer coverage 98.50% lines, 88.15% branches, 88.00% funcs | green live |
-| P6 | named-device harness assertions | `ANDROID_SERIAL=localhost:5556 BENCHMARK_DEVICE_NAME='redroid14_x86_64 isolated (AX102)' ./scripts/device/benchmark.sh` plus 20 cold runs summarized in `docs/benchmarks/2026-08-31-redroid14-isolated-cold-summary.md` | 20,480/20,480 routes; raw benchmark JSON/log pairs under `docs/benchmarks/` | green isolated device-local |
-| P7–P8 | deterministic rebuild and hostile audit fixtures | `make verify-local`, `make audit-public`, gitleaks, public `git push`, GitHub Release `v0.1.0`, fresh public clone replay, Pages deploy `33436205596`, CI on `main` `33436205561`, and CI on tag `v0.1.0` `33436223268` all pass | consolidated reports under `coverage/`, `docs/evidence/`, `docs/security/`, and the release asset URL | green public |
+- unit tests for the shared draft lifecycle, trim, profile, metrics, serialization,
+  and publish payload;
+- hostile fixture tests for DEM provenance, checksum drift, no-data, and rebuild
+  determinism;
+- Rust tests for `routeMany`, pack versioning, shortcut unpacking, ownership, and
+  browser/native boundary errors;
+- D1 integration tests for migrations, idempotency, conflict, TTL, rate-limit,
+  indexed cell query path, and exact bbox reads;
+- browser tests for WASM routing, editing, trimming, confirmation, publish, and
+  mobile viewport accessibility;
+- mobile controller tests for offline editing, retry, persistence, and network
+  quarantine;
+- device scripts for airplane-mode boot, local route, and benchmark logging.

@@ -3,14 +3,18 @@ import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:f
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import test from "node:test";
+import { deflateSync } from "node:zlib";
 import {
   buildMvtTile,
   buildRoutingGraph,
+  decodeTerrariumPng,
   decodeVarint,
   encodeVarint,
   parsePmtilesHeader,
   listFiles,
   normalizeOverpass,
+  loadTerrariumDem,
+  sampleTerrariumElevation,
   sha256,
   verifyFixture,
   zxyToTileId,
@@ -18,6 +22,46 @@ import {
 
 const root = resolve(import.meta.dirname, "../..");
 const fixture = join(root, "fixtures/sydney");
+
+function pngChunk(type, data) {
+  const chunk = Buffer.alloc(12 + data.length);
+  chunk.writeUInt32BE(data.length, 0);
+  chunk.write(type, 4, "ascii");
+  data.copy(chunk, 8);
+  return chunk;
+}
+
+function tinyTerrariumPng(options = {}) {
+  const {
+    width = 2,
+    height = 2,
+    bitDepth = 8,
+    colorType = 6,
+    compression = 0,
+    filter = 0,
+    interlace = 0,
+    rowFilter = 0,
+    truncateRaster = false,
+  } = options;
+  const channels = colorType === 2 ? 3 : 4;
+  const header = Buffer.alloc(13);
+  header.writeUInt32BE(width, 0);
+  header.writeUInt32BE(height, 4);
+  header[8] = bitDepth;
+  header[9] = colorType;
+  header[10] = compression;
+  header[11] = filter;
+  header[12] = interlace;
+  const raster = Buffer.alloc((width * channels + 1) * height, 128);
+  for (let row = 0; row < height; row += 1) raster[row * (width * channels + 1)] = rowFilter;
+  const compressed = deflateSync(truncateRaster ? raster.subarray(1) : raster);
+  return Buffer.concat([
+    Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
+    pngChunk("IHDR", header),
+    pngChunk("IDAT", compressed),
+    pngChunk("IEND", Buffer.alloc(0)),
+  ]);
+}
 
 test("PMTiles varints round-trip boundary values", () => {
   for (const value of [0, 1, 127, 128, 16_383, 16_384, 2 ** 32, Number.MAX_SAFE_INTEGER]) {
@@ -73,6 +117,105 @@ test("tile ids follow the PMTiles Hilbert ordering", () => {
   );
 });
 
+test("Terrarium decoder and sampler expose finite Sydney elevations", () => {
+  const dem = loadTerrariumDem(join(fixture, "dem"));
+  const source = JSON.parse(readFileSync(join(fixture, "dem/source.json"), "utf8"));
+  assert.equal(source.provider, "Mapzen / Tilezen Terrain Tiles on AWS Open Data");
+  assert.equal(source.encoding, "terrarium");
+  assert.equal(source.zoom, 15);
+  assert.equal(source.tiles.length, 6);
+  for (const tile of source.tiles) {
+    const decoded = decodeTerrariumPng(readFileSync(join(fixture, "dem", tile.path)));
+    assert.equal(decoded.width, 256);
+    assert.equal(decoded.height, 256);
+  }
+  for (const point of [
+    { lat: -33.873, lng: 151.204 },
+    { lat: -33.8675, lng: 151.2105 },
+    { lat: -33.862, lng: 151.217 },
+  ]) {
+    assert.ok(Number.isFinite(sampleTerrariumElevation(dem, point)));
+  }
+});
+
+test("Terrarium decoder fails closed on malformed and unsupported rasters", () => {
+  assert.throws(() => decodeTerrariumPng(Buffer.alloc(0)), /signature/);
+  const truncatedChunk = Buffer.concat([
+    Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
+    Buffer.from([0, 0, 0, 32, 73, 72, 68, 82, 0, 0, 0, 0]),
+  ]);
+  assert.throws(() => decodeTerrariumPng(truncatedChunk), /truncated.*chunk/);
+  assert.throws(
+    () => decodeTerrariumPng(Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), Buffer.alloc(8)])),
+    /no image data/,
+  );
+  assert.throws(() => decodeTerrariumPng(tinyTerrariumPng({ bitDepth: 16 })), /unsupported/);
+  assert.throws(() => decodeTerrariumPng(tinyTerrariumPng({ colorType: 0 })), /unsupported/);
+  assert.throws(() => decodeTerrariumPng(tinyTerrariumPng({ compression: 1 })), /unsupported/);
+  assert.throws(() => decodeTerrariumPng(tinyTerrariumPng({ filter: 1 })), /unsupported/);
+  assert.throws(() => decodeTerrariumPng(tinyTerrariumPng({ interlace: 1 })), /unsupported/);
+  assert.throws(() => decodeTerrariumPng(tinyTerrariumPng({ truncateRaster: true })), /raster length/);
+  assert.throws(() => decodeTerrariumPng(tinyTerrariumPng({ rowFilter: 5 })), /row filter/);
+});
+
+test("Terrarium sampler rejects missing coverage, transparent no-data, and invalid coordinates", () => {
+  const source = { zoom: 0, tileSize: 2 };
+  const opaquePixels = Buffer.from([
+    128, 0, 0, 255, 128, 1, 0, 255,
+    128, 2, 0, 255, 128, 3, 0, 255,
+  ]);
+  const tile = { width: 2, height: 2, channels: 4, pixels: opaquePixels };
+  const dem = { source, tiles: new Map([["0/0/0", tile]]) };
+
+  assert.ok(Number.isFinite(sampleTerrariumElevation(dem, { lat: 66, lng: -90 })));
+  assert.throws(
+    () => sampleTerrariumElevation({ source, tiles: new Map() }, { lat: 66, lng: -90 }),
+    /coverage missing/,
+  );
+  assert.throws(() => sampleTerrariumElevation(dem, { lat: Number.NaN, lng: 0 }), /invalid DEM coordinate/);
+
+  const transparent = { ...tile, pixels: Buffer.from(opaquePixels) };
+  transparent.pixels[3] = 0;
+  assert.throws(
+    () => sampleTerrariumElevation({ source, tiles: new Map([["0/0/0", transparent]]) }, { lat: 66, lng: -90 }),
+    /no-data pixel/,
+  );
+});
+
+test("DEM loader enforces its pinned source contract and tile integrity", () => {
+  const temporary = mkdtempSync(join(tmpdir(), "route-dem-contract-"));
+  try {
+    writeFileSync(join(temporary, "source.json"), JSON.stringify({ encoding: "raw", tileSize: 256, zoom: 15, tiles: [] }));
+    assert.throws(() => loadTerrariumDem(temporary), /unsupported DEM source contract/);
+
+    writeFileSync(join(temporary, "source.json"), JSON.stringify({
+      encoding: "terrarium",
+      tileSize: 256,
+      zoom: 15,
+      tiles: [{ x: 1, y: 2, path: "missing.png", bytes: 4, sha256: "deadbeef" }],
+    }));
+    assert.throws(() => loadTerrariumDem(temporary), /integrity mismatch/);
+
+    const smallTilePath = join(temporary, "small.png");
+    writeFileSync(smallTilePath, tinyTerrariumPng({ width: 2, height: 256 }));
+    writeFileSync(join(temporary, "source.json"), JSON.stringify({
+      encoding: "terrarium",
+      tileSize: 256,
+      zoom: 15,
+      tiles: [{
+        x: 1,
+        y: 2,
+        path: "small.png",
+        bytes: readFileSync(smallTilePath).length,
+        sha256: sha256(smallTilePath),
+      }],
+    }));
+    assert.throws(() => loadTerrariumDem(temporary), /dimensions mismatch/);
+  } finally {
+    rmSync(temporary, { recursive: true, force: true });
+  }
+});
+
 test("walking graph filters forbidden ways and keeps its largest component", () => {
   const source = {
     nodes: [
@@ -95,9 +238,10 @@ test("walking graph filters forbidden ways and keeps its largest component", () 
       { id: 4, nodes: [4, 5], tags: { highway: "path", access: "private" } },
     ],
   };
-  const graph = buildRoutingGraph(source);
+  const graph = buildRoutingGraph(source, { sample: ({ lat, lng }) => Math.round((lat + lng) * 10) });
   assert.equal(graph.nodes.length, 8);
   assert.equal(graph.arcs.length, 16);
+  assert.ok(graph.nodes.every((node) => Number.isInteger(node.elevationM)));
   assert.ok(graph.arcs.every((arc) => arc.weight > 0));
 });
 
@@ -124,7 +268,7 @@ test("PMTiles header parser rejects malformed archives", () => {
 
 test("fixture verifier returns independently parsed archive facts", () => {
   const result = verifyFixture(fixture);
-  assert.equal(result.manifest.id, "sydney-cbd-walking-v1");
+  assert.equal(result.manifest.id, "sydney-cbd-walking-v2");
   assert.equal(result.header.addressedTiles, 26);
   assert.ok(result.declaredBytes < 5_000_000);
 });
@@ -177,6 +321,28 @@ test("fixture verifier rejects provenance drift", () => {
     manifest.source.snapshot = "1999-01-01T00:00:00Z";
     writeFileSync(manifestPath, `${JSON.stringify(manifest)}\n`);
     assert.throws(() => verifyFixture(candidate), /provenance/);
+  } finally {
+    rmSync(temporaryRoot, { recursive: true, force: true });
+  }
+});
+
+test("fixture verifier rejects DEM datum and derived elevation range drift", () => {
+  const temporaryRoot = mkdtempSync(join(tmpdir(), "fixture-elevation-contract-"));
+  const candidate = join(temporaryRoot, "sydney");
+  cpSync(fixture, candidate, { recursive: true });
+  try {
+    const manifestPath = join(candidate, "manifest.json");
+    const original = JSON.parse(readFileSync(manifestPath, "utf8"));
+    for (const [field, value] of [
+      ["vertical_datum", "unknown"],
+      ["min_m", original.elevation.min_m - 1],
+      ["max_m", original.elevation.max_m + 1],
+    ]) {
+      const manifest = structuredClone(original);
+      manifest.elevation[field] = value;
+      writeFileSync(manifestPath, `${JSON.stringify(manifest)}\n`);
+      assert.throws(() => verifyFixture(candidate), /DEM provenance|elevation range/);
+    }
   } finally {
     rmSync(temporaryRoot, { recursive: true, force: true });
   }

@@ -1,6 +1,116 @@
 {
-  "fixture": "sydney-cbd-walking-v1",
-  "assets": ["tiles.pmtiles", "routing.pack", "style.json"],
-  "network": "none during offline boot, map display, taps, route calculation",
-  "attribution": "© OpenStreetMap contributors, ODbL-1.0"
+  "schema_version": 2,
+  "id": "sydney-cbd-walking-v2",
+  "bbox": [
+    151.204,
+    -33.873,
+    151.217,
+    -33.862
+  ],
+  "source": {
+    "file": "source.osm.json",
+    "snapshot": "2026-08-31T07:49:41Z",
+    "attribution": "© OpenStreetMap contributors",
+    "license": "ODbL-1.0"
+  },
+  "build": {
+    "command": "make fixture",
+    "deterministic": true,
+    "network_required": false
+  },
+  "routing": {
+    "status": "ready",
+    "path": "routing.pack",
+    "source": "graph.json",
+    "builder_contract": "cch-routing-lite build-pack",
+    "pack_schema": "CCHP2",
+    "command": "cargo run --release -p cch-routing-lite --bin build-pack -- fixtures/sydney/graph.json fixtures/sydney/routing.pack"
+  },
+  "elevation": {
+    "provider": "Mapzen / Tilezen Terrain Tiles on AWS Open Data",
+    "encoding": "terrarium",
+    "zoom": 15,
+    "attribution": "Terrain data processed by Mapzen/Tilezen; Australia terrain data © Commonwealth of Australia (Geoscience Australia) 2017",
+    "license": "CC-BY-4.0",
+    "license_url": "https://creativecommons.org/licenses/by/4.0/",
+    "vertical_datum": "upstream-source-dependent; not normalized for survey use",
+    "covered_nodes": 7023,
+    "min_m": 4,
+    "max_m": 112
+  },
+  "budget": {
+    "max_bytes": 5000000
+  },
+  "assets": [
+    {
+      "path": "source.osm.json",
+      "bytes": 1545438,
+      "sha256": "40d41f7358682648c100ec341b4d96559c51d73a12dfb5e7ccf684e2b249ba72"
+    },
+    {
+      "path": "graph.json",
+      "bytes": 952351,
+      "sha256": "ac75a52d1368602c8fe828e9c2b891d1097f638c4a92f4dcfe055afb90a882cc"
+    },
+    {
+      "path": "map.pmtiles",
+      "bytes": 680630,
+      "sha256": "706ff6ef92465001b8e9479468ce9de7c3fa1aadcea0f5a1697ad403de938562"
+    },
+    {
+      "path": "style.json",
+      "bytes": 1427,
+      "sha256": "084f1c5afb20fcf46631f9b47b2d64e767494c944be999764d2a350dd4039fdc"
+    },
+    {
+      "path": "glyphs/Offline Sans/0-255.pbf",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "ATTRIBUTION.md",
+      "bytes": 1946,
+      "sha256": "a326b2e2fcf4c51e8a3fe4fe13431319ca65ed342867fd526dca8de897c8acf6"
+    },
+    {
+      "path": "dem/source.json",
+      "bytes": 2915,
+      "sha256": "2e48c3472a433f71c51a8d685fdbf59bfdb3d809d3c6d3b06deacd6b6c840a5c"
+    },
+    {
+      "path": "dem/tiles/15-30146-19663.png",
+      "bytes": 65281,
+      "sha256": "7017df895ceda7d2d4ca2865dc5b6ec5e5a07d22105ee50c62944b192039a7df"
+    },
+    {
+      "path": "dem/tiles/15-30146-19664.png",
+      "bytes": 75640,
+      "sha256": "b21df2375e4bd108ac378fbbba28c8b0bc8e24559dd5439946289473645e5b61"
+    },
+    {
+      "path": "dem/tiles/15-30147-19663.png",
+      "bytes": 90457,
+      "sha256": "10ae58bfdae71690f05e234ce8be3e46ab7c84f9527a70e74798ac57cfafc58e"
+    },
+    {
+      "path": "dem/tiles/15-30147-19664.png",
+      "bytes": 85202,
+      "sha256": "898794aa7e4df938941e181ffe34daf466f07e9ebe846e73dd9c10d6cfe5d2dc"
+    },
+    {
+      "path": "dem/tiles/15-30148-19663.png",
+      "bytes": 66780,
+      "sha256": "a112e29ed5654d604c50bcdc40fe4f7a2ec96f57704c014d83230a444bef38a5"
+    },
+    {
+      "path": "dem/tiles/15-30148-19664.png",
+      "bytes": 70735,
+      "sha256": "5f9e20beeed9e3912eb66b942f00067edfa857d40b3d22e6dfe40941cb74b65b"
+    },
+    {
+      "path": "routing.pack",
+      "bytes": 1135727,
+      "sha256": "18cf63b62f29db48a760c4fb85b38a00d146f2441c2213868647a9c673bfbc95"
+    }
+  ]
 }

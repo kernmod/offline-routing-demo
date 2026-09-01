@@ -10,6 +10,7 @@ export type Coordinate = { lat: number; lng: number };
 export interface OfflineRouterNative extends HybridObject<{ ios: "c++"; android: "c++" }> {
   loadPack(pack: ArrayBuffer): string;
   route(origin: Coordinate, destination: Coordinate): string;
+  routeMany(controls: Coordinate[], closedLoop: boolean): string;
   benchmark(device: string): string;
   startTileServer(assetDirectory: string, port: number): number;
   stopTileServer(): void;

@@ -10,6 +10,7 @@ class HybridOfflineRouterNative final : public HybridOfflineRouterNativeSpec {
   ~HybridOfflineRouterNative() override;
   std::string loadPack(const std::shared_ptr<ArrayBuffer>& pack) override;
   std::string route(const Coordinate& origin, const Coordinate& destination) override;
+  std::string routeMany(const std::vector<Coordinate>& controls, bool closedLoop) override;
   std::string benchmark(const std::string& device) override;
   double startTileServer(const std::string& assetDirectory, double port) override;
   void stopTileServer() override;

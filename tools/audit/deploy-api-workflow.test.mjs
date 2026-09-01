@@ -28,6 +28,7 @@ test("API deploy only runs for relevant main changes or manual dispatch", () => 
     "pnpm-workspace.yaml",
     ".node-version",
     "tools/deploy/**",
+    "tools/live/**",
     ".github/workflows/deploy-api.yml"
   ]);
 });

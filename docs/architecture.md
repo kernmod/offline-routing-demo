@@ -1,55 +1,143 @@
 # Architecture
 
-Status on 2026-08-31: `LIVE_VERIFIED` for the API, public browser viewer, Android
-delivery, airplane-mode route, and online publish/read loop. The fixture,
-routing core, and named-device benchmark are separately reproducible local
-evidence; the benchmark is not presented as a live service. Evidence is linked
-from the root README and `docs/evidence/`.
+Status on 2026-09-01: the repository baseline contains historical
+`LIVE_VERIFIED` evidence for the public offline-routing delivery, and Route
+Studio `v1.1` is locally verified across the shared domain, Rust/native,
+Rust/WASM, Worker/D1, mobile, and browser surfaces.
+
+The public production URLs still need a redeploy from `main` before `v2` live verification can be closed. The older public API can still be present.
 
 ## System shape
 
 ```text
-public Sydney inputs ──> reproducible fixture builder ──> PMTiles + style + glyphs + CCHP1
-                                                                     │
-                                                                     v
-tap A/B ──> React Native UI ──> Nitro bridge ──> C++ wrapper ──> Rust CCH query
-   │             │                                            │
-   │             └──────── embedded MapLibre assets ───────────┘
-   │
-   └── when online ──> Worker API ──> D1 segments + z14 spatial cells
-                              ^                    │
-                              └── MapLibre GL JS viewer <──────────┘
+public Sydney OSM + DEM
+         │
+         ├── fixture builder ──> PMTiles + style + manifest
+         └── graph builder ──> CCHP2 routing.pack + SHA-256
+                                      │
+                 ┌────────────────────┴────────────────────┐
+                 v                                         v
+        mobile Route Studio                       web Route Studio
+     React Native + Nitro/C++                 React + WASM + MapLibre GL JS
+                 │                                         │
+                 └──── packages/route-studio domain ──────┘
+                                      │
+                             explicit publish only
+                                      │
+                                      v
+                          Worker API + D1 + z14 cells
 ```
 
-The offline boundary contains every asset needed to boot the map and calculate a
-route: PMTiles, style JSON, glyph ranges, sprites, and a versioned routing pack.
-The mobile UI needs no location permission; two explicit map taps make
-demonstrations deterministic and avoid collecting personal coordinates.
+The repository has two boundaries only:
 
-The route flow is intentionally explicit across the bridge: JS handles user
-input and screen state, Nitro moves the call into C++, C++ owns the native
-object boundary, and Rust performs CCH packing, upward query, and unpacking.
-The result comes back as GeoJSON and updates a reactive `GeoJSONSource` on the
-map.
+- local routing/editing: fixture assets, map rendering, route editing, elevation
+  profile, trim, and draft persistence;
+- online publication: bounded `POST /v2/segments` and `GET /v2/segments`.
 
-The online boundary is intentionally smaller. It accepts bounded encoded
-geometry, recomputes derived metadata, writes one segment plus fixed Web
-Mercator cell keys, and exposes bbox reads. Seed rows remain available for the
-viewer; anonymous writes expire. The viewer and API share schemas from
-`packages/shared`.
+There is no HTTP routing API, no JS shortest-path fallback, no account system,
+and no server-side draft store.
 
-## Workspace responsibilities
+## Shared editing model
 
-| Path | Responsibility |
-| --- | --- |
-| `fixtures/sydney` | source manifest, checksums, attribution, expected outputs |
-| `crates/cch-routing-lite` | public fixture builder, `CCHP1` pack loader, CCH query, recursive unpack |
-| `crates/cch-routing-lite-ffi` | narrow ownership-safe C ABI |
-| `crates/tile-server-lite` | bounded PMTiles v3 leaf lookup and loopback-only HTTP range serving |
-| `packages/offline-router` | typed mobile-facing Nitro contract and benchmark bridge |
-| `apps/mobile` | offline map, tap-to-route, publish/read UI, benchmark launcher |
-| `apps/api` | validated Worker endpoints, D1 migrations, privacy rules, z14 cells |
-| `apps/viewer` | install-free MapLibre GL JS segment map |
+`packages/route-studio` is the public source of truth for both clients:
 
-Architecture decisions that affect reproducibility, security, or public API shape are
-recorded as ADRs. Operational progress belongs in issue/PR evidence, not architecture.
+- control points are distinct from routed geometry;
+- edits invalidate only adjacent legs and reroute them locally;
+- loop closure adds the last-to-first leg explicitly;
+- undo/redo uses bounded snapshots and excludes drag previews;
+- trim is non-destructive and keeps the full route as source of truth;
+- publication is explicit: `draft -> ready -> publishing -> published`, with
+  retry returning to `ready` and resume-edit returning to `draft`.
+
+This package has no React, DOM, or native dependency.
+
+## Routing and elevation
+
+`fixtures/sydney` carries:
+
+- pinned OSM extract metadata;
+- a pinned public DEM crop with source URL, sizes, SHA-256, licence, and attribution;
+- a `CCHP2` graph and `routing.pack` with integer node elevation;
+- a manifest that records every asset and its digest.
+
+`crates/cch-routing-lite` builds and loads the pack, answers `route` and
+`routeMany`, and unpacks shortcuts into final geometry. Elevation changes only
+profile and D+/D- reporting after unpack. It never changes routing cost.
+
+The same pack is consumed by:
+
+- `packages/offline-router` through Nitro/native on Android;
+- `crates/cch-routing-lite-wasm` in the browser.
+
+Golden tests enforce parity on the same fixture and pack.
+
+## Mobile path
+
+`apps/mobile` embeds the PMTiles map, style, and `routing.pack`. On boot it:
+
+1. starts the loopback tile server;
+2. loads the embedded pack through the Nitro bridge to Rust CCH;
+3. restores one local private draft if present;
+4. routes every edit locally;
+5. only touches the network for explicit publish or nearby refresh actions.
+
+The Android build removes location and legacy storage permissions. Release
+verification checks airplane mode, app startup, back handling, and a local route
+deep-link without network dependency.
+
+## Web path
+
+`apps/viewer` loads the same pack and a WASM router at runtime. The map is
+editable immediately:
+
+- click to add controls;
+- drag to move them;
+- reorder/delete from the side rail;
+- use undo/redo and loop toggle;
+- inspect the elevation profile and trim selection;
+- publish a confirmed named snapshot.
+
+Playwright asserts that these flows work on both desktop and mobile viewport and
+that no `/route` request is sent over the network.
+
+## API and storage
+
+`apps/api` exposes two public operations:
+
+- `POST /v2/segments`
+- `GET /v2/segments?bbox=minLat,minLng,maxLat,maxLng`
+
+The accepted write body is exactly:
+
+```json
+{
+  "name": "string",
+  "geometry": [{"lat": 0, "lng": 0, "elevationM": 0}],
+  "controlPoints": [0, 4, 9]
+}
+```
+
+The client sends idempotency in the `idempotency-key` UUIDv4 header. The server:
+
+- normalizes and validates the name;
+- validates geometry and control anchors;
+- recomputes distance, ascent, descent, bbox, encoded geometry, and z14 cells;
+- stores only immutable published snapshots;
+- applies TTL to anonymous rows;
+- rate-limits reads and writes at the edge.
+
+The database query path always starts from indexed `segment_cells`, then applies
+the exact bbox filter.
+
+## Public exclusions
+
+The repo intentionally excludes:
+
+- private product vocabulary and assets;
+- multi-tenant auth;
+- ranking, competition, oracle, anti-cheat, or economy logic;
+- private map/game layers and proprietary runtime formats;
+- METIS in the runtime path.
+
+METIS remains an optional preprocessing experiment for a different future scope,
+not a dependency of this public Route Studio.

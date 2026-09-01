@@ -184,6 +184,76 @@ unsafe fn routing_router_route_impl(
     unsafe { write_owned_buffer(payload, out_buffer) }
 }
 
+/// Routes through 2-16 ordered controls and returns one owned JSON payload.
+///
+/// The operation is atomic: if any leg fails, no partial buffer is written.
+///
+/// # Safety
+///
+/// When `control_count > 0`, `controls_ptr` must designate a readable array of
+/// exactly at least `control_count` `RoutingCoordinate` items. `out_buffer` must
+/// be null or point to writable `RoutingBuffer` storage. A null output is
+/// rejected without dereference. `router` is treated as an opaque address.
+#[no_mangle]
+pub unsafe extern "C" fn routing_router_route_many(
+    router: *const RoutingHandle,
+    controls_ptr: *const RoutingCoordinate,
+    control_count: usize,
+    closed_loop: bool,
+    out_buffer: *mut RoutingBuffer,
+) -> i32 {
+    catch_status(|| {
+        // SAFETY: the extern contract is unchanged; this wrapper only adds a panic barrier.
+        unsafe {
+            routing_router_route_many_impl(
+                router,
+                controls_ptr,
+                control_count,
+                closed_loop,
+                out_buffer,
+            )
+        }
+    })
+}
+
+unsafe fn routing_router_route_many_impl(
+    router: *const RoutingHandle,
+    controls_ptr: *const RoutingCoordinate,
+    control_count: usize,
+    closed_loop: bool,
+    out_buffer: *mut RoutingBuffer,
+) -> i32 {
+    if router.is_null()
+        || controls_ptr.is_null()
+        || out_buffer.is_null()
+        || !(2..=16).contains(&control_count)
+    {
+        return ROUTING_ERR_INVALID_ARGUMENT;
+    }
+    let entry = {
+        let registry = lock_or_recover(&ROUTERS);
+        let Some(entry) = registry.get(&(router as usize)) else {
+            return ROUTING_ERR_INVALID_ARGUMENT;
+        };
+        Arc::clone(entry)
+    };
+    // SAFETY: the C caller contract above guarantees this region is readable.
+    let controls = unsafe { std::slice::from_raw_parts(controls_ptr, control_count) };
+    let controls: Vec<_> = controls
+        .iter()
+        .map(|coordinate| Coordinate::new(coordinate.lat, coordinate.lng))
+        .collect();
+    let route = match entry.router.route_many(&controls, closed_loop) {
+        Ok(route) => route,
+        Err(_) => return ROUTING_ERR_ROUTE,
+    };
+    let Ok(payload) = serde_json::to_vec(&route) else {
+        return ROUTING_ERR_INTERNAL;
+    };
+    // SAFETY: checked non-null above; caller guarantees writable output storage.
+    unsafe { write_owned_buffer(payload, out_buffer) }
+}
+
 /// Benchmarks the complete route path over a deterministic 1,024-request
 /// corpus. Pack loading is timed separately and returned as `packLoadMicros`.
 ///

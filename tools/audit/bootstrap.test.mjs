@@ -35,10 +35,18 @@ test("README describes the recruiter-facing problem and commands", () => {
   assert.match(readme, /^## Reproduce it/m);
   assert.match(readme, /https:\/\/kernmod\.github\.io\/offline-routing-demo\//);
   assert.match(readme, /https:\/\/offline-routing-segments\.yaktrak\.workers\.dev/);
-  assert.match(readme, /releases\/download\/v0\.1\.0\/offline-routing-demo-cchp1\.apk/);
+  assert.match(readme, /releases\/download\/v0\.2\.0\/offline-routing-demo-route-studio\.apk/);
+  assert.match(readme, /pnpm verify:live-api --url https:\/\/<worker-origin>/);
   assert.doesNotMatch(readme, /pending (?:GitHub Release|public URL|Worker URL)/i);
   assert.equal(existsSync(resolve(root, "docs/evidence/2026-08-31T20-01-00Z-live-viewer.png")), true);
   assert.equal(existsSync(resolve(root, "docs/evidence/2026-08-31T20-10-00Z-mobile-live.png")), true);
+});
+
+test("the Android release artifact is named for Route Studio rather than a stale pack revision", () => {
+  const buildScript = read("scripts/build-apk.sh");
+
+  assert.match(buildScript, /offline-routing-demo-route-studio\.apk/);
+  assert.doesNotMatch(buildScript, /cchp1/i);
 });
 
 test("public evidence omits builder home paths", () => {
@@ -224,10 +232,9 @@ test("architecture and public boundary stay honest about live delivery status", 
   const architecture = read("docs/architecture.md");
   const boundary = read("docs/security/public-boundary.md");
   const readiness = read("docs/security/public-readiness.md");
-  assert.match(architecture, /LIVE_VERIFIED/);
-  assert.doesNotMatch(architecture, /deployment evidence remains open/i);
-  assert.match(readiness, /LIVE_VERIFIED/);
-  assert.doesNotMatch(readiness, /Remaining blockers before publication/);
+  assert.match(architecture, /public[\s\S]*production URLs still need a redeploy from `main` before `v2` live verification/i);
+  assert.match(readiness, /public live[\s\S]*verification is pending the next `main` deployment/i);
+  assert.match(readiness, /returns `404` on `POST \/v2\/segments`/i);
   assert.match(architecture, /Nitro bridge.*Rust CCH/i);
   assert.match(architecture, /PMTiles/i);
   assert.match(boundary, /clean history/i);

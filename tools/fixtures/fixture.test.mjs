@@ -25,8 +25,8 @@ function listFiles(directory, prefix = "") {
 
 test("manifest describes a bounded, attributed Sydney fixture", () => {
   const manifest = loadManifest();
-  assert.equal(manifest.schema_version, 1);
-  assert.equal(manifest.id, "sydney-cbd-walking-v1");
+  assert.equal(manifest.schema_version, 2);
+  assert.equal(manifest.id, "sydney-cbd-walking-v2");
   assert.deepEqual(manifest.bbox, [151.204, -33.873, 151.217, -33.862]);
   assert.match(manifest.source.license, /ODbL-1\.0/);
   assert.match(manifest.source.attribution, /OpenStreetMap contributors/);
@@ -35,6 +35,14 @@ test("manifest describes a bounded, attributed Sydney fixture", () => {
   assert.equal(manifest.build.network_required, false);
   assert.ok(["pending", "ready"].includes(manifest.routing.status));
   assert.equal(manifest.routing.builder_contract, "cch-routing-lite build-pack");
+  assert.equal(manifest.routing.pack_schema, "CCHP2");
+  assert.equal(manifest.elevation.provider, "Mapzen / Tilezen Terrain Tiles on AWS Open Data");
+  assert.equal(manifest.elevation.encoding, "terrarium");
+  assert.equal(manifest.elevation.zoom, 15);
+  assert.equal(manifest.elevation.license, "CC-BY-4.0");
+  assert.match(manifest.elevation.license_url, /creativecommons\.org\/licenses\/by\/4\.0/);
+  assert.equal(manifest.elevation.covered_nodes, 7023);
+  assert.match(manifest.elevation.attribution, /Geoscience Australia/);
 });
 
 test("every declared asset has the exact size and sha256 digest", () => {
@@ -83,7 +91,9 @@ test("routing graph matches the public deterministic builder contract", () => {
   assert.ok(graph.arcs.length >= graph.nodes.length, "graph must contain directed arcs");
   assert.deepEqual(Object.keys(graph).sort(), ["arcs", "nodes"]);
   for (const node of graph.nodes) {
-    assert.deepEqual(Object.keys(node).sort(), ["lat", "lng"]);
+    assert.deepEqual(Object.keys(node).sort(), ["elevationM", "lat", "lng"]);
+    assert.ok(Number.isInteger(node.elevationM));
+    assert.ok(node.elevationM > -100 && node.elevationM < 500);
     assert.ok(node.lng >= 151.204 && node.lng <= 151.217);
     assert.ok(node.lat >= -33.873 && node.lat <= -33.862);
   }
@@ -114,6 +124,15 @@ test("licence and provenance files are explicit", () => {
   assert.match(attribution, /OpenStreetMap contributors/);
   assert.match(attribution, /Open Data Commons Open Database License/);
   assert.match(attribution, /source\.osm\.json/);
+  assert.match(attribution, /Mapzen|Tilezen/);
+  assert.match(attribution, /Geoscience Australia/);
+  assert.match(attribution, /Terrarium/);
+  const dataSources = readFileSync(join(root, "docs/data-sources.md"), "utf8");
+  assert.match(dataSources, /AWS Open Data/);
+  assert.match(dataSources, /elevation-tiles-prod/);
+  assert.match(dataSources, /Terrarium/);
+  assert.match(dataSources, /Geoscience Australia/);
+  assert.equal(statSync(join(root, "docs/adr/0008-elevation-fixture.md")).isFile(), true);
 });
 
 test("build is deterministic and succeeds without network", () => {

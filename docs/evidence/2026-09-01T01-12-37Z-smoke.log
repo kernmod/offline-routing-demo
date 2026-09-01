@@ -1,0 +1,5 @@
+--------- beginning of main
+Running "main"
+OfflineRoutingBootReady {"mapPath":"file:///data/user/0/dev.offlinerouting.demo/cache/offline-routing-fixture/map.pmtiles","stylePath":"file:///data/user/0/dev.offlinerouting.demo/cache/offline-routing-fixture/style.json","packPath":"file:///data/user/0/dev.offlinerouting.demo/cache/offline-routing-fixture/routing.pack","styleUrl":"http://127.0.0.1:37975/style.json"}
+OfflineRoutingRoute {"routeSource":"local_native","distanceM":311,"pointCount":23,"networkAttempts":0}
+OfflineRoutingMapReady {"styleUrl":"http://127.0.0.1:37975/style.json","networkAttempts":0}
