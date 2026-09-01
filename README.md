@@ -97,8 +97,8 @@ viewer under `/offline-routing-demo/`; the API workflow applies remote D1
 migrations, deploys the Worker, then reruns the live `POST /v2/segments` and
 `GET /v2/segments?bbox=...` contract verifier. The iOS workflow runs on
 GitHub-hosted macOS, builds the XCFramework from public Rust crates only,
-compiles the unsigned simulator app, boots a named simulator, opens a route
-deep link, and archives the runtime evidence.
+compiles the unsigned simulator app, boots a named simulator, injects a route
+scenario at launch, and archives the runtime evidence.
 
 ## Reproduce it
 
@@ -177,9 +177,12 @@ The iOS packaging path is intentionally public and narrow:
   and loopback tile-server C ABIs in a single link unit;
 - one `OfflineRouterCore.xcframework` is required by the CocoaPods spec and checked
   fail-loud before compilation;
-- one simulator smoke script opens `offlineroutingdemo://route?...` and requires the
-  `OfflineRoutingRoute` log to report `routeSource:"local_native"` and
-  `networkAttempts":0`.
+- one simulator smoke script injects the same deterministic route URL as a
+  simulator-only launch property, avoiding the iOS 26 system confirmation
+  dialog, and requires the `OfflineRoutingRoute` log to report
+  `routeSource:"local_native"` and `networkAttempts":0`;
+- the public `offlineroutingdemo://route?...` deep link remains available for
+  normal manual use.
 
 Physical iPhone installation is not part of the secret-free public scope. That
 would require Apple signing credentials provided outside this repository.

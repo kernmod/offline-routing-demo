@@ -175,8 +175,22 @@ test("the native package exposes the same routing-only Nitro surface on iOS", ()
   assert.doesNotMatch(appDelegate, /^internal import Expo$/m);
   assert.match(appDelegate, /bindReactNativeFactory\(factory\)/);
   assert.ok(appDelegate.indexOf("bindReactNativeFactory(factory)") < appDelegate.indexOf("factory.startReactNative("));
+  assert.match(appDelegate, /#if targetEnvironment\(simulator\)/);
+  assert.match(appDelegate, /--offline-routing-verification-route/);
+  assert.match(appDelegate, /initialProperties: verificationInitialProperties\(\)/);
+  assert.match(appDelegate, /let result = RCTLinkingManager\.application\(app, open: url, options: options\)/);
+  assert.doesNotMatch(appDelegate, /return super\.application\(app, open: url, options: options\) \|\| RCTLinkingManager/);
   assert.match(podfile, /\$MLRN\.post_install\(installer\)/);
   assert.ok(appConfig.expo.plugins.includes("@maplibre/maplibre-react-native"));
+});
+
+test("the iOS simulator verifier injects its deterministic route without a system URL dialog", () => {
+  const verifier = read("../../packages/offline-router/scripts/verify-ios-simulator.sh");
+  const app = read("App.tsx");
+  assert.match(verifier, /--offline-routing-verification-route/);
+  assert.doesNotMatch(verifier, /simctl openurl/);
+  assert.match(app, /verificationRouteUrl\?: string/);
+  assert.match(app, /handleDeepLink\(verificationRouteUrl/);
 });
 
 test("no JavaScript graph or shortest-path implementation is shipped beside the native bridge", () => {

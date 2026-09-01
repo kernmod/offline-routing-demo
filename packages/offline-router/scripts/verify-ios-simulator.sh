@@ -6,8 +6,8 @@ usage() {
 Usage: verify-ios-simulator.sh --app /absolute/path/mobile.app [--evidence-dir /absolute/path]
 
 Boots an available iPhone simulator, installs the unsigned Release application,
-opens the deterministic Sydney route deep link, and records proof that Rust routed
-locally without a routing-network attempt.
+injects the deterministic Sydney verification route at launch, and records proof
+that Rust routed locally without a routing-network attempt.
 USAGE
 }
 
@@ -154,7 +154,8 @@ xcrun simctl spawn "$device_udid" log stream \
 log_pid=$!
 sleep 2
 
-xcrun simctl launch --terminate-running-process "$device_udid" "$bundle_id" > "$launch_log" 2>&1
+xcrun simctl launch --terminate-running-process "$device_udid" "$bundle_id" \
+  --offline-routing-verification-route "$route_url" > "$launch_log" 2>&1
 
 wait_for_log() {
   marker="$1"
@@ -176,7 +177,6 @@ wait_for_log() {
 }
 
 wait_for_log "OfflineRoutingMapReady"
-xcrun simctl openurl "$device_udid" "$route_url"
 wait_for_log "OfflineRoutingRoute"
 
 route_line="$(grep -F "OfflineRoutingRoute" "$runtime_log" | tail -1)"

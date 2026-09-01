@@ -108,7 +108,8 @@ test("ios packaging builds public Rust libraries into a required XCFramework", (
   assert.match(workflow, /verify-ios-simulator\.sh/);
   assert.match(simulatorScript, /xcrun simctl bootstatus/);
   assert.match(simulatorScript, /xcrun simctl install/);
-  assert.match(simulatorScript, /xcrun simctl openurl/);
+  assert.match(simulatorScript, /--offline-routing-verification-route/);
+  assert.doesNotMatch(simulatorScript, /xcrun simctl openurl/);
   assert.match(simulatorScript, /OfflineRoutingRoute/);
   assert.match(simulatorScript, /routeSource.*local_native/);
   assert.match(simulatorScript, /networkAttempts.*0/);

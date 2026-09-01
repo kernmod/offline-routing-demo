@@ -97,8 +97,10 @@ For iOS, the same app uses:
   app links a single Rust archive rather than two independent Rust static
   libraries;
 - one simulator smoke gate that boots a named iPhone simulator, installs the
-  unsigned Release app, opens a deep link, and checks the log evidence for
-  `routeSource:"local_native"` and `networkAttempts":0`.
+  unsigned Release app, injects a deterministic simulator-only route property,
+  and checks the log evidence for `routeSource:"local_native"` and
+  `networkAttempts":0`. The launch property avoids the iOS 26 custom-scheme
+  confirmation dialog; the regular public deep link remains enabled.
 
 Physical-device signing stays out of scope for the public repo. The CI proof is
 the unsigned simulator build and runtime evidence on macOS.

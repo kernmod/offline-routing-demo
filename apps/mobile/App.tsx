@@ -68,7 +68,9 @@ const sydneyCenter = [151.2105, -33.8675] as [number, number];
 const sydneyInitialView = { center: sydneyCenter, zoom: 14, pitch: 48, bearing: -18 };
 const emptyMetrics: Metrics = { pointCount: 0, distanceM: 0, ascentM: 0, descentM: 0 };
 
-export default function App() {
+type AppProps = { verificationRouteUrl?: string };
+
+export default function App({ verificationRouteUrl }: AppProps) {
   const controllerRef = useRef<Controller | null>(null);
   const nativeRouterRef = useRef<Awaited<ReturnType<typeof prepareOfflineFixture>>["router"] | null>(null);
   const [studio, setStudio] = useState<StudioState | null>(null);
@@ -169,6 +171,7 @@ export default function App() {
         return controllerRef.current!.tapPoint(route.destination);
       });
     };
+    void handleDeepLink(verificationRouteUrl ?? null);
     Linking.getInitialURL().then(handleDeepLink).catch(() => undefined);
     const subscription = Linking.addEventListener("url", (event) => {
       void handleDeepLink(event.url);
@@ -177,7 +180,7 @@ export default function App() {
       cancelled = true;
       subscription.remove();
     };
-  }, [Boolean(studio)]);
+  }, [Boolean(studio), verificationRouteUrl]);
 
   const onMapPress = (event: NativeSyntheticEvent<PressEvent>) => {
     if (!controllerRef.current || busy) return;

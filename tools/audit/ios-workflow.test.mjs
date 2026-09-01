@@ -27,7 +27,8 @@ test("public iOS workflow proves simulator builds without Apple signing secrets"
   assert.match(verifier, /device\.name === requestedName/);
   assert.match(verifier, /xcrun simctl bootstatus/);
   assert.match(verifier, /xcrun simctl install/);
-  assert.match(verifier, /xcrun simctl openurl/);
+  assert.match(verifier, /--offline-routing-verification-route/);
+  assert.doesNotMatch(verifier, /xcrun simctl openurl/);
   assert.match(verifier, /offlineroutingdemo:\/\/route/);
   assert.match(verifier, /OfflineRoutingMapReady/);
   assert.match(verifier, /OfflineRoutingRoute/);
