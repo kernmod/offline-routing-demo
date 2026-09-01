@@ -23,7 +23,7 @@ and no business vocabulary or artifacts from the product repo.
 
 - Browser viewer: <https://kernmod.github.io/offline-routing-demo/>
 - Segment API health: <https://offline-routing-segments.yaktrak.workers.dev/health>
-- Android APK: <https://github.com/kernmod/offline-routing-demo/releases/download/v0.2.0/offline-routing-demo-route-studio.apk>
+- Android APK: <https://github.com/kernmod/offline-routing-demo/releases/download/v0.3.0/offline-routing-demo-route-studio.apk>
 
 ## What this demonstrates
 
@@ -146,13 +146,14 @@ ANDROID_SERIAL=localhost:5556 \
 ```
 
 The build generates a demo keystore under `$HOME` only. No signing material is
-committed. The currently published public release remains `v0.2.0`, with
-SHA-256 `ad121007ab699974609103faf5ec3fd37192b9347da464cb5ec8c8eec3f9661f`.
-The local cartography-3D refresh is additionally smoke-tested in airplane mode
-and recorded in
+committed. The published `v0.3.0` asset has SHA-256
+`d4a4e6b1f10f74c0a63f614e1c5d57400e9b7037c9ab6b4bfdb443d2e36d6b1a`.
+Its cartography-3D release gate was run in airplane mode and is recorded in
 [`docs/evidence/2026-09-01T03-59-40Z-release-device.txt`](docs/evidence/2026-09-01T03-59-40Z-release-device.txt).
 The earlier three-control-point loop and undo/redo replay remains documented in
 [`docs/evidence/2026-09-01T01-51-18Z-release-multipoint-airplane.txt`](docs/evidence/2026-09-01T01-51-18Z-release-multipoint-airplane.txt).
+The adjacent checksum asset uses the APK basename, so `sha256sum -c` works
+after downloading both files into any directory.
 
 ### Benchmarks
 

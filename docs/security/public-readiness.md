@@ -13,13 +13,13 @@ verification is closed on the deployed `main` baseline.
   longer mention private map/game chunk formats.
 - gitleaks `v8.28.0` reports no leak on the publication file set or reachable
   public Git history; the scan is repeated before each publication commit.
-- `docs/evidence/2026-09-01T03-59-40Z-release-device.txt` records the current
-  cartography branch APK gate on `redroid14_x86_64` in airplane mode, after the
-  public multi-layer PMTiles/style refresh. The evidence stores only the APK
-  digest, not a builder-local path.
+- `docs/evidence/2026-09-01T03-59-40Z-release-device.txt` records the published
+  `v0.3.0` APK gate on `redroid14_x86_64` in airplane mode, after the public
+  multi-layer PMTiles/style refresh. Its digest matches the GitHub Release
+  asset, and the evidence stores no builder-local path.
 - `docs/evidence/2026-09-01T01-51-18Z-release-multipoint-airplane.txt` records
   three control points, local loop recalculation, undo/redo, and zero network
-  attempts against that same published APK digest.
+  attempts against the preceding `v0.2.0` release.
 - `docs/benchmarks/2026-09-01T01-42-17Z.json` records the current Nitro/native
   benchmark on `redroid14_x86_64 isolated (AX102)`: cold pack load 98,827 µs,
   warm p50 1,182 µs, warm p95 1,624 µs across 1,024 queries.
@@ -56,6 +56,8 @@ verification is closed on the deployed `main` baseline.
 - The first deployment run verified too early and briefly observed `404` on
   `POST /v2/segments`; rerunning the same workflow after edge propagation
   closed the contract without code changes.
+- GitHub Actions runs `33468847188` (CI), `33468847348` (Pages), and
+  `33468847304` (API) completed successfully for the cartography commit.
 - The GitHub Pages deployment for the same `main` baseline also completed, so
   the public browser and the public Worker now expose the same Route Studio
   `v1.1` contract.

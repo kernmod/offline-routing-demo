@@ -35,7 +35,7 @@ test("README describes the recruiter-facing problem and commands", () => {
   assert.match(readme, /^## Reproduce it/m);
   assert.match(readme, /https:\/\/kernmod\.github\.io\/offline-routing-demo\//);
   assert.match(readme, /https:\/\/offline-routing-segments\.yaktrak\.workers\.dev/);
-  assert.match(readme, /releases\/download\/v0\.2\.0\/offline-routing-demo-route-studio\.apk/);
+  assert.match(readme, /releases\/download\/v0\.3\.0\/offline-routing-demo-route-studio\.apk/);
   assert.match(readme, /pnpm verify:live-api --url https:\/\/<worker-origin>/);
   assert.doesNotMatch(readme, /pending (?:GitHub Release|public URL|Worker URL)/i);
   assert.equal(existsSync(resolve(root, "docs/evidence/2026-08-31T20-01-00Z-live-viewer.png")), true);
@@ -65,15 +65,17 @@ test("API documentation matches the published v2 record and query columns", () =
 test("the Android release artifact is named for Route Studio rather than a stale pack revision", () => {
   const buildScript = read("scripts/build-apk.sh");
   const readme = read("README.md");
-  const releaseEvidence = read("docs/evidence/2026-09-01T01-53-00Z-release-device.txt");
+  const releaseEvidence = read("docs/evidence/2026-09-01T03-59-40Z-release-device.txt");
   const multipointEvidence = read("docs/evidence/2026-09-01T01-51-18Z-release-multipoint-airplane.txt");
 
   assert.match(buildScript, /offline-routing-demo-route-studio\.apk/);
   assert.doesNotMatch(buildScript, /cchp1/i);
-  assert.match(readme, /ad121007ab699974609103faf5ec3fd37192b9347da464cb5ec8c8eec3f9661f/);
+  assert.match(readme, /v0\.3\.0/);
+  assert.match(readme, /d4a4e6b1f10f74c0a63f614e1c5d57400e9b7037c9ab6b4bfdb443d2e36d6b1a/);
+  assert.match(releaseEvidence, /release=v0\.3\.0/);
   assert.match(releaseEvidence, /airplane_mode=1/);
   assert.match(releaseEvidence, /route=local_native/);
-  assert.match(releaseEvidence, /apk_sha256=ad121007ab699974609103faf5ec3fd37192b9347da464cb5ec8c8eec3f9661f/);
+  assert.match(releaseEvidence, /apk_sha256=d4a4e6b1f10f74c0a63f614e1c5d57400e9b7037c9ab6b4bfdb443d2e36d6b1a/);
   assert.match(multipointEvidence, /control_points=3/);
   assert.match(multipointEvidence, /network_attempts=0/);
   assert.match(multipointEvidence, /redo_enabled_after_undo=pass/);

@@ -1,6 +1,7 @@
 device=redroid14_x86_64
 android=14
 abi=x86_64
+release=v0.3.0
 airplane_mode=1
 startup=pass
 back=pass
