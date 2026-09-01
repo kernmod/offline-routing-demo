@@ -11,7 +11,7 @@ import {
   type GestureResponderEvent,
   type LayoutChangeEvent
 } from "react-native";
-import Svg, { Circle, Defs, LinearGradient, Line, Path, Rect, Stop } from "react-native-svg";
+import Svg, { Defs, LinearGradient, Line, Path, Rect, Stop } from "react-native-svg";
 import type { ControlPoint, DraftMetrics, DraftSelection, ProfilePoint, RouteStudioDraft } from "@offline-routing/route-studio";
 import {
   profilePath,
@@ -113,7 +113,6 @@ export function ElevationProfile({ profile, totalDistanceM, selection, cursorDis
   selectionRef.current = currentSelection;
   const path = useMemo(() => profilePath(profile), [profile]);
   const x = (percent: number) => (percent / 100) * 600;
-  const markerX = (percent: number) => Math.min(586, Math.max(14, x(percent)));
   const startGesture = (handle: TrimHandle) => {
     const current = selectionRef.current;
     setActiveHandle(handle);
@@ -191,8 +190,6 @@ export function ElevationProfile({ profile, totalDistanceM, selection, cursorDis
         <Rect x={x(range.afterLeftPct)} y={0} width={600 - x(range.afterLeftPct)} height={150} fill={colors.ink} fillOpacity={0.7} />
         <Line x1={x(range.startPct)} x2={x(range.startPct)} y1={4} y2={146} stroke={colors.ochre} strokeWidth={activeHandle === "start" ? 8 : 5} />
         <Line x1={x(range.endPct)} x2={x(range.endPct)} y1={4} y2={146} stroke={colors.sage} strokeWidth={activeHandle === "end" ? 8 : 5} />
-        <Circle cx={markerX(range.startPct)} cy={18} r={12} fill={colors.ochre} stroke={colors.paper} strokeWidth={2.5} />
-        <Circle cx={markerX(range.endPct)} cy={18} r={12} fill={colors.sage} stroke={colors.paper} strokeWidth={2.5} />
         {range.cursorPct !== null && <Line x1={x(range.cursorPct)} x2={x(range.cursorPct)} y1={4} y2={146} stroke={colors.sienna} strokeWidth={1} strokeDasharray="4 4" vectorEffect="non-scaling-stroke" />}
       </Svg>
       <Pressable
@@ -217,9 +214,7 @@ export function ElevationProfile({ profile, totalDistanceM, selection, cursorDis
         onAccessibilityAction={(event) => adjustHandle("start", event.nativeEvent.actionName === "increment" ? 1 : event.nativeEvent.actionName === "decrement" ? -1 : 0)}
         style={[styles.handleTouch, { left: `${range.startPct}%` }]}
         {...startHandleResponder.panHandlers}
-      >
-        <View style={[styles.handle, styles.handleStart, activeHandle === "start" && styles.handleActive]} />
-      </View>
+      />
       <View
         accessible
         accessibilityRole="adjustable"
@@ -232,9 +227,9 @@ export function ElevationProfile({ profile, totalDistanceM, selection, cursorDis
         onAccessibilityAction={(event) => adjustHandle("end", event.nativeEvent.actionName === "increment" ? 1 : event.nativeEvent.actionName === "decrement" ? -1 : 0)}
         style={[styles.handleTouch, { left: `${range.endPct}%` }]}
         {...endHandleResponder.panHandlers}
-      >
-        <View style={[styles.handle, styles.handleEnd, activeHandle === "end" && styles.handleActive]} />
-      </View>
+      />
+      <View pointerEvents="none" style={[styles.visualHandleMarker, styles.visualHandleMarkerStart, { left: `${range.startPct}%` }]} />
+      <View pointerEvents="none" style={[styles.visualHandleMarker, styles.visualHandleMarkerEnd, { left: `${range.endPct}%` }]} />
     </View>
     <View style={styles.profileReadout}>
       <View style={styles.profileReadoutItem}><View style={[styles.readoutDot, styles.readoutDotStart]} /><Text style={styles.profileReadoutLabel}>from</Text><Text style={styles.profileReadoutValue}>{formatDistance(currentSelection.startM)}</Text></View>
@@ -291,7 +286,7 @@ const styles = StyleSheet.create({
   metricStrip: { flexDirection: "row", justifyContent: "space-between", borderTopWidth: 1, borderBottomWidth: 1, borderColor: colors.line, paddingVertical: 12 }, metricValue: { color: colors.paper, fontSize: 15, fontWeight: "800" }, metricLabel: { color: colors.muted, fontSize: 10, marginTop: 2 },
   empty: { color: colors.muted, lineHeight: 20 }, pointList: { gap: 8 }, pointRow: { flexDirection: "row", alignItems: "center", borderWidth: 1, borderColor: colors.line, borderRadius: 12, padding: 8, backgroundColor: colors.raised }, pointRowActive: { borderColor: colors.ochre }, pointNumber: { width: 26, height: 26, borderRadius: 13, backgroundColor: colors.moss, alignItems: "center", justifyContent: "center" }, pointNumberText: { color: colors.ink, fontWeight: "900", fontSize: 12 }, pointBody: { flex: 1, minWidth: 0, paddingHorizontal: 9 }, pointRole: { color: colors.paper, fontWeight: "700", fontSize: 12 }, coordinate: { color: colors.muted, fontSize: 10, marginTop: 2 }, pointActions: { flexDirection: "row", flexWrap: "wrap", justifyContent: "flex-end", gap: 4, maxWidth: 190 },
   sectionHeading: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" }, sectionTitle: { color: colors.paper, fontSize: 18, fontWeight: "800" }, sectionMeta: { color: colors.muted, fontSize: 10 },
-  profile: { height: 142, marginTop: 10, marginHorizontal: 22, overflow: "visible", borderRadius: 10, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.ink }, profileSvg: { position: "absolute", inset: 0 }, profileInspect: { position: "absolute", zIndex: 2, inset: 0 }, handleTouch: { position: "absolute", zIndex: 5, top: 0, bottom: 0, width: 44, marginLeft: -22, alignItems: "center", justifyContent: "center" }, handle: { width: 3, height: "100%", borderRadius: 3, backgroundColor: colors.ochre }, handleStart: { backgroundColor: colors.ochre }, handleEnd: { backgroundColor: colors.sage }, handleActive: { width: 5 }, profileReadout: { flexDirection: "row", alignItems: "center", marginTop: 8, paddingHorizontal: 2 }, profileReadoutItem: { flex: 1, flexDirection: "row", alignItems: "center", gap: 6 }, profileReadoutRule: { width: 1, height: 18, marginHorizontal: 10, backgroundColor: colors.line }, readoutDot: { width: 7, height: 7, borderRadius: 4 }, readoutDotStart: { backgroundColor: colors.ochre }, readoutDotEnd: { backgroundColor: colors.sage }, profileReadoutLabel: { color: colors.muted, fontSize: 10 }, profileReadoutValue: { color: colors.paper, fontSize: 12, fontWeight: "800", marginLeft: "auto" },
+  profile: { height: 142, marginTop: 10, marginHorizontal: 22, overflow: "visible", borderRadius: 10, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.ink }, profileSvg: { position: "absolute", inset: 0 }, profileInspect: { position: "absolute", zIndex: 2, inset: 0 }, handleTouch: { position: "absolute", zIndex: 5, top: 0, bottom: 0, width: 44, marginLeft: -22 }, visualHandleMarker: { position: "absolute", zIndex: 6, top: 6, width: 26, height: 26, marginLeft: -13, borderRadius: 7, borderWidth: 2, borderColor: colors.paper, elevation: 4 }, visualHandleMarkerStart: { backgroundColor: colors.ochre }, visualHandleMarkerEnd: { backgroundColor: colors.sage }, profileReadout: { flexDirection: "row", alignItems: "center", marginTop: 8, paddingHorizontal: 2 }, profileReadoutItem: { flex: 1, flexDirection: "row", alignItems: "center", gap: 6 }, profileReadoutRule: { width: 1, height: 18, marginHorizontal: 10, backgroundColor: colors.line }, readoutDot: { width: 7, height: 7, borderRadius: 4 }, readoutDotStart: { backgroundColor: colors.ochre }, readoutDotEnd: { backgroundColor: colors.sage }, profileReadoutLabel: { color: colors.muted, fontSize: 10 }, profileReadoutValue: { color: colors.paper, fontSize: 12, fontWeight: "800", marginLeft: "auto" },
   trimRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, alignItems: "center" }, nudgeGroup: { flexDirection: "row", alignItems: "center", gap: 5, padding: 4, borderWidth: 1, borderColor: colors.line, borderRadius: 10, backgroundColor: colors.ink }, trimLabel: { color: colors.muted, fontSize: 10, width: 30, marginLeft: 4 }, publication: { gap: 10, paddingTop: 2 }, statusBadge: { color: colors.sage, borderWidth: 1, borderColor: colors.line, borderRadius: 12, paddingHorizontal: 9, paddingVertical: 3, fontSize: 10 }, input: { color: colors.paper, borderWidth: 1, borderColor: colors.line, borderRadius: 10, minHeight: 46, paddingHorizontal: 13, backgroundColor: colors.ink }, note: { color: colors.muted, fontSize: 11, lineHeight: 17 }, publishActions: { flexDirection: "row", gap: 8 },
   modalBackdrop: { flex: 1, justifyContent: "center", padding: 24, backgroundColor: "rgba(7,10,8,0.82)" }, modalCard: { padding: 22, borderRadius: 18, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.panel, gap: 12 }, modalKicker: { color: colors.ochre, fontSize: 10, fontWeight: "900", letterSpacing: 1.8 }, modalTitle: { color: colors.paper, fontSize: 24, fontWeight: "800" }, modalMetric: { color: colors.sage, fontSize: 16, fontWeight: "700" }
 });

@@ -1,5 +1,5 @@
 import { mkdirSync, readdirSync, readFileSync, statSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { dirname, isAbsolute, resolve } from "node:path";
 
 export function extractOutputDirectories(compileCommandsText) {
   const entries = JSON.parse(compileCommandsText);
@@ -7,12 +7,14 @@ export function extractOutputDirectories(compileCommandsText) {
 
   for (const entry of entries) {
     const command = typeof entry?.command === "string" ? entry.command : "";
+    const workingDirectory = typeof entry?.directory === "string" ? entry.directory : process.cwd();
     for (const flag of ["-o", "-MF"]) {
       const pattern = new RegExp(`${flag}\\s+('([^']+)'|"([^"]+)"|(\\S+))`, "g");
       for (const match of command.matchAll(pattern)) {
         const target = match[2] ?? match[3] ?? match[4];
         if (!target) continue;
-        directories.add(dirname(target));
+        const absoluteTarget = isAbsolute(target) ? target : resolve(workingDirectory, target);
+        directories.add(dirname(absoluteTarget));
       }
     }
   }

@@ -39,12 +39,7 @@ if [[ ! -f "$keystore" ]]; then
 fi
 
 cd "$demo_root/apps/mobile/android"
-PATH="$node22_bin:$PATH" NODE_ENV=production ./gradlew --no-daemon --max-workers=1 "-PreactNativeArchitectures=$abis" \
-  clean \
-  ":app:configureCMakeRelWithDebInfo[arm64-v8a]" \
-  ":app:configureCMakeRelWithDebInfo[x86_64]"
-node "$demo_root/scripts/device/prepare-cxx-dirs.mjs" \
-  "$demo_root/apps/mobile/android/app/.cxx/RelWithDebInfo"
+PATH="$node22_bin:$PATH" NODE_ENV=production ./gradlew --no-daemon --max-workers=1 "-PreactNativeArchitectures=$abis" clean
 PATH="$node22_bin:$PATH" NODE_ENV=production ./gradlew --no-daemon --max-workers=1 "-PreactNativeArchitectures=$abis" assembleRelease --rerun-tasks
 apk_source="$demo_root/apps/mobile/android/app/build/outputs/apk/release/app-release.apk"
 mkdir -p "$release_dir"

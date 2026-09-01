@@ -57,8 +57,8 @@ test("mobile elevation cut mirrors the web profile with direct handles on Androi
   const controls = read("src/components/StudioControls.tsx");
   const viewModel = read("src/studioViewModel.ts");
   assert.match(controls, /from "react-native-svg"/);
-  assert.match(controls, /<Circle[^>]+fill=\{colors\.ochre\}/);
-  assert.match(controls, /<Circle[^>]+fill=\{colors\.sage\}/);
+  assert.match(controls, /styles\.visualHandleMarkerStart/);
+  assert.match(controls, /styles\.visualHandleMarkerEnd/);
   assert.match(controls, /PanResponder\.create/);
   assert.match(controls, /onPanResponderGrant/);
   assert.match(controls, /onPanResponderMove/);
@@ -244,9 +244,10 @@ test("release signing uses a generated home debug keystore rather than a repo-lo
   assert.match(buildScript, /scripts\/device\/clean-generated\.sh/);
   assert.match(buildScript, /node22_bin=/);
   assert.match(buildScript, /gradlew[\s\S]*clean/);
-  assert.match(buildScript, /configureCMakeRelWithDebInfo\[arm64-v8a\]/);
-  assert.match(buildScript, /configureCMakeRelWithDebInfo\[x86_64\]/);
-  assert.match(buildScript, /scripts\/device\/prepare-cxx-dirs\.mjs/);
+  assert.doesNotMatch(buildScript, /configureCMakeRelWithDebInfo/);
+  assert.doesNotMatch(buildScript, /prepare_cxx_roots|collect_existing_paths/);
+  assert.match(source, /buildCMakeRelWithDebInfo/);
+  assert.match(source, /prepare-cxx-dirs\.mjs/);
   assert.match(buildScript, /gradlew[\s\S]*assembleRelease --rerun-tasks/);
   assert.match(buildScript, /PATH=\"\$node22_bin:\$PATH\" NODE_ENV=production/);
   assert.match(buildScript, /assembleRelease --rerun-tasks/);
@@ -254,6 +255,7 @@ test("release signing uses a generated home debug keystore rather than a repo-lo
   assert.doesNotMatch(cleanScript, /apps\/mobile\/android\/build/);
   assert.doesNotMatch(cleanScript, /apps\/mobile\/android\/app\/build/);
   assert.doesNotMatch(cleanScript, /apps\/mobile\/android\/\.gradle/);
+  assert.match(cleanScript, /apps\/mobile\/android\/app\/\.cxx/);
   assert.match(cleanScript, /packages\/offline-router\/android\/\.cxx/);
   assert.doesNotMatch(cleanScript, /packages\/offline-router\/android\/build/);
   assert.match(cleanScript, /apps\/mobile\/android\/app\/debug\.keystore/);
