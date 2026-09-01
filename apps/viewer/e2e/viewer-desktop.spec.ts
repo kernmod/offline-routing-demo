@@ -95,6 +95,6 @@ test("desktop: edits, trims and publishes a multipoint route with local WASM onl
 
   await expect(page.getByText("Published · Harbour field test")).toBeVisible();
   await expect(page.getByLabel("Route Studio editor")).toHaveAttribute("data-draft-status", "published");
-  await expect(page.getByRole("button", { name: "Segment 779a8cf1-e8e5-4590-8aa8-f46d30c3194d" })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("button", { name: "Segment Harbour field test" })).toHaveAttribute("aria-pressed", "true");
   expect(routingRequests).toEqual([]);
 });
