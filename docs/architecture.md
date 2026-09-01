@@ -1,11 +1,9 @@
 # Architecture
 
-Status on 2026-09-01: the repository baseline contains historical
-`LIVE_VERIFIED` evidence for the public offline-routing delivery, and Route
-Studio `v1.1` is locally verified across the shared domain, Rust/native,
-Rust/WASM, Worker/D1, mobile, and browser surfaces.
-
-The public production URLs still need a redeploy from `main` before `v2` live verification can be closed. The older public API can still be present.
+Status on 2026-09-01: Route Studio `v1.1` is verified across the shared
+domain, Rust/native, Rust/WASM, Worker/D1, mobile, browser, and live public
+deployment surfaces. The public production URLs now serve the `v1.1` contract
+from the deployed `main` baseline.
 
 ## System shape
 

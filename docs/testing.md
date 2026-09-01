@@ -68,7 +68,7 @@ The Route Studio build order is enforced by tests:
 | P7 browser E2E | `pnpm --filter @offline-routing/viewer test:e2e` | 6/6 pass desktop + mobile viewport | green |
 | P8 root coverage | `pnpm test:coverage` | LCOV_OK for root, mobile, offline-router, api, viewer, and shared | green |
 | P8 Rust coverage | `cargo llvm-cov --workspace --all-targets --exclude cch-routing-lite-wasm --fail-under-lines 80` | `coverage/rust.lcov` regenerated; the browser-only WASM crate stays covered by `pnpm build:wasm` and viewer parity/E2E gates | green |
-| P8 live `v2` | `pnpm verify:live-api --url <worker>` | current old public API still needs redeploy from `main`; local deploy contract and verifier are green | pending deploy |
+| P8 live `v2` | `pnpm verify:live-api --url <worker>` | `LIVE_API_OK health=200 publish=201 replay=200 conflict=409 nearby=200` against the public Worker | green |
 
 ## Command reference
 

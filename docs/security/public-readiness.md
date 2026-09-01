@@ -1,6 +1,7 @@
 # Public Readiness
 
-Status on 2026-09-01: local publication gates are closed; public live verification is pending the next `main` deployment.
+Status on 2026-09-01: local publication gates are closed and the public live
+verification is closed on the deployed `main` baseline.
 
 ## Local evidence closed
 
@@ -39,8 +40,14 @@ Status on 2026-09-01: local publication gates are closed; public live verificati
 
 ## Live delivery evidence
 
-- The public Worker currently still returns `404` on `POST /v2/segments`, which
-  means the older API revision is still deployed at the public origin.
-- The GitHub Pages and Worker workflows are in place to close this gap from
-  `main`; once they succeed, the live verifier and browser smoke must be rerun
-  before claiming `LIVE_VERIFIED`.
+- `https://offline-routing-segments.yaktrak.workers.dev/health` returns
+  `200 {"ok":true}` on the live Worker.
+- `node tools/live/verify-api.mjs --url https://offline-routing-segments.yaktrak.workers.dev`
+  returned `LIVE_API_OK health=200 publish=201 replay=200 conflict=409 nearby=200`
+  on 2026-09-01 after the `deploy-api` workflow rerun completed.
+- The first deployment run verified too early and briefly observed `404` on
+  `POST /v2/segments`; rerunning the same workflow after edge propagation
+  closed the contract without code changes.
+- The GitHub Pages deployment for the same `main` baseline also completed, so
+  the public browser and the public Worker now expose the same Route Studio
+  `v1.1` contract.

@@ -1,10 +1,9 @@
 # Segment API contract
 
-Status on 2026-09-01: locally verified for `v2`; public production still needs
-the next `main` deployment. The last live probe against
-`https://offline-routing-segments.yaktrak.workers.dev` returned `404` on
-`POST /v2/segments`, which means the public Worker is still serving the older
-revision.
+Status on 2026-09-01: verified locally and live for `v2`. The live verifier
+against `https://offline-routing-segments.yaktrak.workers.dev` returned
+`LIVE_API_OK health=200 publish=201 replay=200 conflict=409 nearby=200` after
+the deployed `main` baseline completed.
 
 ## Endpoints
 
@@ -130,4 +129,5 @@ existing. An `always()` cleanup removes the temporary file after the deploy step
 The public repository variable `SEGMENTS_API_URL` points Pages at the verified
 Worker URL. Credentials remain in GitHub or the caller's environment; they are
 never committed. Every new production environment must repeat the migration,
-deploy, and live publish/read proof before claiming `LIVE_VERIFIED`.
+deploy, and live publish/read proof before claiming `LIVE_VERIFIED`. On the
+public reference deployment, that proof closed on 2026-09-01.
