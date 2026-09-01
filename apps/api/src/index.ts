@@ -89,6 +89,7 @@ const LIMITS = {
 const V2_LIMITS = {
   bodyBytes: 512 * 1024,
   points: 4_096,
+  queryLimit: 10,
   controlPoints: 16,
   minElevationM: -500,
   maxElevationM: 9_000,
@@ -172,9 +173,41 @@ function rateLimiterUnavailable(): Error {
 async function readPublishBody(request: Request, maxBodyBytes = LIMITS.bodyBytes): Promise<unknown> {
   const contentType = request.headers.get("content-type") ?? "";
   if (!contentType.toLowerCase().startsWith("application/json")) throw bodyError();
-  const text = await request.text();
-  if (new TextEncoder().encode(text).byteLength > maxBodyBytes) throw bodyError(413);
+
+  const contentLength = request.headers.get("content-length");
+  if (contentLength !== null) {
+    if (!/^(0|[1-9]\d*)$/.test(contentLength)) throw bodyError();
+    const declaredBytes = Number(contentLength);
+    if (!Number.isSafeInteger(declaredBytes) || declaredBytes > maxBodyBytes) throw bodyError(413);
+  }
+
+  if (!request.body) throw bodyError();
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let byteLength = 0;
   try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      byteLength += value.byteLength;
+      if (byteLength > maxBodyBytes) {
+        await reader.cancel();
+        throw bodyError(413);
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  const bytes = new Uint8Array(byteLength);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  try {
+    const text = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
     return JSON.parse(text) as unknown;
   } catch {
     throw bodyError();
@@ -475,7 +508,7 @@ export function listNearbySegmentsQuery({ tileKeys, bbox, nowIso, limit = LIMITS
   };
 }
 
-export function listNearbySegmentsV2Query({ tileKeys, bbox, nowIso, limit = LIMITS.queryLimit }: {
+export function listNearbySegmentsV2Query({ tileKeys, bbox, nowIso, limit = V2_LIMITS.queryLimit }: {
   tileKeys: string[];
   bbox: Bbox;
   nowIso: string;
