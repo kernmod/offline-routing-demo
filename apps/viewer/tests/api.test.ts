@@ -126,6 +126,38 @@ describe("live segments API client", () => {
     });
   });
 
+  it("rejects a successful publication response that omits the full v2 record", async () => {
+    const payload = {
+      name: "Harbour rise",
+      geometry: [
+        { lat: -33.87, lng: 151.2, elevationM: 8 },
+        { lat: -33.869, lng: 151.201, elevationM: 14 }
+      ],
+      controlPoints: [0, 1]
+    };
+    const fetcher = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          id: "77aeafc2-d8dc-40a7-bfd9-d231cf5e04e0",
+          publicationState: "published"
+        }),
+        { status: 201 }
+      )
+    );
+
+    await expect(
+      publishSegmentV2(
+        "https://api.example",
+        payload,
+        "779a8cf1-e8e5-4590-8aa8-f46d30c3194d",
+        fetcher
+      )
+    ).rejects.toMatchObject({
+      code: "invalid_payload",
+      message: "The publication response could not be read."
+    });
+  });
+
   it("rejects invalid idempotency keys before making a request", async () => {
     const fetcher = vi.fn();
     await expect(

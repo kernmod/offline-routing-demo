@@ -81,12 +81,6 @@ function isSegmentV2(value: unknown): value is ApiSegmentV2 {
   );
 }
 
-function isPublishedRecord(value: unknown): value is Pick<ApiSegmentV2, "id" | "publicationState"> {
-  if (!value || typeof value !== "object") return false;
-  const candidate = value as Record<string, unknown>;
-  return typeof candidate.id === "string" && candidate.publicationState === "published";
-}
-
 export type PublishSegmentInput = Readonly<{
   name: string;
   geometry: Array<{ lat: number; lng: number; elevationM: number }>;
@@ -171,10 +165,10 @@ export async function publishSegmentV2(
     });
     if (!response.ok) throw new SegmentsApiError("http_error", "Publication failed.");
     const payload: unknown = await response.json();
-    if (!isSegmentV2(payload) && !isPublishedRecord(payload)) {
+    if (!isSegmentV2(payload)) {
       throw new SegmentsApiError("invalid_payload", "The publication response could not be read.");
     }
-    return payload as ApiSegmentV2;
+    return payload;
   } catch (error) {
     if (error instanceof SegmentsApiError) throw error;
     throw new SegmentsApiError("network_error", "Publication failed.");
