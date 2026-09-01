@@ -151,7 +151,14 @@ The benchmark exercises the production Nitro/C++/Rust path with a fixed
 1,024-query corpus and records cold-load plus warm-query p50/p95 on the named
 device only.
 
-Current named-device run on 2026-09-01:
+Release-gate named-device run on 2026-09-01T01:06:14Z:
+
+- device: `redroid14_x86_64 isolated (AX102)`
+- warm-query p50: `1,212 µs`
+- warm-query p95: `1,674 µs`
+- cold pack-load: `136,366 µs`
+
+Follow-up named-device rerun on 2026-09-01T01:20:28Z:
 
 - device: `redroid14_x86_64 isolated (AX102)`
 - warm-query p50: `1,183 µs`
