@@ -8,7 +8,7 @@
   },
   "scripts": {
     "test": "pnpm test:policy && pnpm test:root && pnpm -r test",
-    "test:coverage": "pnpm coverage:clean && pnpm coverage:root && pnpm -r test:coverage && pnpm coverage:mobile && pnpm coverage:offline-router && pnpm coverage:assert",
+    "test:coverage": "pnpm coverage:clean && pnpm coverage:root && pnpm -r --workspace-concurrency=1 test:coverage && pnpm coverage:mobile && pnpm coverage:offline-router && pnpm coverage:assert",
     "test:root": "node --test tools/audit/*.test.mjs tools/deploy/*.test.mjs tools/fixtures/*.test.mjs tools/live/*.test.mjs",
     "test:policy": "node tools/audit/test-policy.mjs",
     "build:wasm": "node tools/wasm/build.mjs",

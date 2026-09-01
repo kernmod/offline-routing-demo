@@ -1,4 +1,5 @@
 import { spawnSync } from "node:child_process";
+import { rmSync } from "node:fs";
 import { homedir } from "node:os";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -6,6 +7,7 @@ import { fileURLToPath } from "node:url";
 const WASM_BINDGEN_VERSION = "0.2.127";
 const workspaceRoot = new URL("../../", import.meta.url);
 const workspacePath = resolve(fileURLToPath(workspaceRoot));
+const wasmTargetDir = resolve(workspacePath, ".cache/wasm-target");
 
 function stableRustflags() {
   const home = resolve(homedir());
@@ -25,6 +27,7 @@ function run(command, args, options = {}) {
     stdio: options.capture ? "pipe" : "inherit",
     env: {
       ...process.env,
+      CARGO_TARGET_DIR: wasmTargetDir,
       CARGO_ENCODED_RUSTFLAGS: stableRustflags(),
       CARGO_INCREMENTAL: "0",
       RUSTFLAGS: "",
@@ -40,6 +43,7 @@ if (installed !== `wasm-bindgen ${WASM_BINDGEN_VERSION}`) {
   throw new Error(`wasm-bindgen ${WASM_BINDGEN_VERSION} is required; found ${installed || "nothing"}`);
 }
 
+rmSync(wasmTargetDir, { recursive: true, force: true });
 run("cargo", [
   "build",
   "--locked",
@@ -56,5 +60,6 @@ run("wasm-bindgen", [
   "apps/viewer/src/wasm/pkg",
   "--out-name",
   "cch_routing_lite_wasm",
-  "target/wasm32-unknown-unknown/release/cch_routing_lite_wasm.wasm",
+  `${wasmTargetDir}/wasm32-unknown-unknown/release/cch_routing_lite_wasm.wasm`,
 ]);
+rmSync(wasmTargetDir, { recursive: true, force: true });

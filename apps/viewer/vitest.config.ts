@@ -9,6 +9,7 @@ export default defineConfig({
     environment: "jsdom",
     setupFiles: ["./tests/setup.ts"],
     include: ["tests/**/*.test.{ts,tsx}"],
+    fileParallelism: false,
     coverage: {
       provider: "v8",
       reportsDirectory: ".cache/coverage",

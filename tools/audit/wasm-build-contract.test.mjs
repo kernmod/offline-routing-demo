@@ -21,10 +21,13 @@ test("WASM generation pins Rust, target, and wasm-bindgen for reproducible publi
   assert.match(builder, /cch-routing-lite-wasm/);
   assert.match(builder, /apps\/viewer\/src\/wasm\/pkg/);
   assert.match(builder, /fileURLToPath/);
+  assert.match(builder, /rmSync/);
+  assert.match(builder, /\.cache\/wasm-target/);
   assert.match(builder, /--remap-path-prefix=/);
   assert.match(builder, /\/workspace/);
   assert.match(builder, /\/cargo-home/);
   assert.match(builder, /\/rustup-home/);
+  assert.match(builder, /CARGO_TARGET_DIR/);
   assert.match(builder, /CARGO_ENCODED_RUSTFLAGS/);
   assert.match(builder, /CARGO_INCREMENTAL:\s*"0"/);
   assert.doesNotMatch(builder, /RUSTFLAGS:\s*\[/);
