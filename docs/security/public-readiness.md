@@ -45,6 +45,9 @@ verification is closed on the deployed `main` baseline.
   rejected if they ever enter the tree or reachable history. The packaging path
   removes repo-local `.cxx`, demo keystore, sourcemap, dex, and Rust JNI
   transients while preserving the signed APK outside the repository.
+- The signed ad hoc iOS archive remains in EAS and is not attached to a public
+  GitHub release because its embedded profile enumerates provisioned device
+  identifiers. Only redacted build facts and its checksum are committed.
 
 ## Live delivery evidence
 

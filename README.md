@@ -223,19 +223,20 @@ Package scripts mirror those commands:
 - `pnpm --dir apps/mobile run build:ios-testflight`
 - `pnpm --dir apps/mobile run submit:ios-testflight`
 
-The current public project-state evidence is
-[`docs/evidence/2026-09-01T07-51-19Z-ios-eas-attempt.md`](docs/evidence/2026-09-01T07-51-19Z-ios-eas-attempt.md):
-Expo authentication and project linking succeed, but non-interactive physical
-iOS delivery is still blocked by remote credential bootstrap for
-`dev.offlinerouting.demo`.
+The signed packaging evidence is
+[`docs/evidence/2026-09-01T08-44-36Z-ios-eas-signed-build.md`](docs/evidence/2026-09-01T08-44-36Z-ios-eas-signed-build.md):
+EAS completed a real `arm64` ad hoc build for `dev.offlinerouting.demo` from the
+public commit, using its own App ID/profile and one enrolled test device. The
+earlier credential-bootstrap attempt remains recorded in
+[`docs/evidence/2026-09-01T07-51-19Z-ios-eas-attempt.md`](docs/evidence/2026-09-01T07-51-19Z-ios-eas-attempt.md).
 
-The account-level distribution certificate can be reused across apps, but
-`dev.offlinerouting.demo` still needs its own App ID and provisioning profile.
-An ad hoc internal build also requires at least one enrolled device.
-Once an App Store Connect API key exists for the project, rerun
+The ad hoc IPA stays in EAS instead of becoming a public GitHub release asset:
+an embedded ad hoc profile enumerates provisioned device identifiers. GitHub
+stores the non-identifying build facts and checksum; the physical-device smoke
+remains a separate evidence gate. When devices change, rerun
 `pnpm --dir apps/mobile run build:ios-internal:refresh`, which expands to
 `eas build --platform ios --profile ios-internal --non-interactive --refresh-ad-hoc-provisioning-profile`,
-to let EAS refresh the Expo-managed ad hoc profile non-interactively.
+to refresh the Expo-managed ad hoc profile non-interactively.
 
 ### Android release and device gate
 
@@ -323,9 +324,9 @@ pnpm verify:live-api --url https://<worker-origin>
 - The API stores generic geometry and metrics, not identities or product logic.
 - The benchmark evidence is honest about the named emulator until an arm64 phone
   run is added.
-- Physical iOS delivery depends on the remote Expo/Apple project state for
-  `dev.offlinerouting.demo`: App ID, provisioning profile, enrolled ad hoc
-  devices, and optionally an App Store Connect app for TestFlight.
+- Signed physical iOS packaging is complete. The remaining device gate is an
+  install plus airplane-mode route smoke on the enrolled iPad. TestFlight still
+  requires an App Store Connect app and submission credentials.
 
 ## Data and licensing
 

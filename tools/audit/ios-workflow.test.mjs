@@ -54,6 +54,7 @@ test("public iOS physical delivery is configured through EAS remote credentials"
   const readme = read("README.md");
   const architecture = read("docs/architecture.md");
   const testing = read("docs/testing.md");
+  const signedBuildEvidence = read("docs/evidence/2026-09-01T08-44-36Z-ios-eas-signed-build.md");
   const preInstall = read("scripts/ios/eas-build-pre-install.sh");
   const generatedBridge = "packages/offline-router/nitrogen/generated/ios/OfflineRouter+autolinking.rb";
 
@@ -137,6 +138,8 @@ test("public iOS physical delivery is configured through EAS remote credentials"
   assert.match(readme, /EXPO_TOKEN/);
   assert.match(readme, /EXPO_ASC_API_KEY_PATH|EXPO_ASC_API_KEY_BASE64/);
   assert.match(readme, /build:ios-internal:refresh/);
+  assert.match(readme, /2026-09-01T08-44-36Z-ios-eas-signed-build\.md/);
+  assert.doesNotMatch(readme, /still blocked by remote credential bootstrap/);
   assert.doesNotMatch(readme, /Physical iPhone installation is not part of the secret-free public scope/);
   assert.match(architecture, /ad hoc internal build/);
   assert.match(architecture, /refresh-ad-hoc-provisioning-profile/);
@@ -145,5 +148,17 @@ test("public iOS physical delivery is configured through EAS remote credentials"
   assert.match(testing, /build:ios-internal:refresh/);
   assert.match(testing, /build:ios-testflight/);
   assert.match(testing, /submit:ios-testflight/);
+  assert.match(testing, /signed ad hoc build/i);
+  assert.match(signedBuildEvidence, /status: `FINISHED`/);
+  assert.match(signedBuildEvidence, /distribution: `INTERNAL`/);
+  assert.match(signedBuildEvidence, /bundle: `dev\.offlinerouting\.demo`/);
+  assert.match(signedBuildEvidence, /architecture: `arm64`/);
+  assert.match(signedBuildEvidence, /879f973bd04c950cfd794c0f7443f7a70f2a5e644d41beacb65449950cf3b325/);
+  assert.match(signedBuildEvidence, /not published as a GitHub release asset/i);
+  assert.doesNotMatch(
+    signedBuildEvidence,
+    /UDID|Serial Number|Developer Portal ID|sottilinim|SW4AV5L9WZ|00008101|2005EF/i,
+    "public build evidence must not expose Apple account, certificate, profile, or device identifiers"
+  );
   assert.doesNotMatch(JSON.stringify(easConfig), /APPLE_|MATCH_|FASTLANE_|P12|KEYCHAIN/i);
 });

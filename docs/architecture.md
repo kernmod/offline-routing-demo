@@ -110,18 +110,16 @@ the bundle ID, the EAS project, and the workflow contract. The actual signing
 material remains remote in Expo/EAS or temporary CI environment variables such
 as `EXPO_TOKEN`, `EXPO_ASC_API_KEY_PATH`, `EXPO_ASC_KEY_ID`, and
 `EXPO_ASC_ISSUER_ID`.
-Once the App Store Connect key exists on the Expo project, the ad hoc profile
-for `dev.offlinerouting.demo` can be refreshed non-interactively with
+The demo now has its own explicit App ID and ad hoc profile for
+`dev.offlinerouting.demo`; its first remote `arm64` `INTERNAL` build completed
+successfully. The account-level certificate is shared without exporting it,
+while the app-specific profile contains one enrolled test device. When that
+device set changes, EAS can rebuild the profile with
 `--refresh-ad-hoc-provisioning-profile`.
 
-As of 2026-09-01, the public Expo project resolves correctly but still needs its
-own remote iOS credential bootstrap before non-interactive ad hoc or TestFlight
-delivery can complete.
-
-The account-level certificate may be shared across apps, but the demo still
-needs its own explicit App ID and provisioning profile because the bundle ID is
-`dev.offlinerouting.demo`. For ad hoc internal build distribution, at least one
-device must be enrolled on the Apple side.
+The signed ad hoc archive remains in EAS rather than GitHub because its embedded
+profile enumerates provisioned device identifiers. TestFlight is a distinct
+store-signed rail and still requires App Store Connect setup/submission.
 
 ## Web path
 
