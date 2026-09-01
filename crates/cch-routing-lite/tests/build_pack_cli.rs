@@ -57,3 +57,29 @@ fn cli_rejects_missing_extra_and_invalid_inputs_without_overwriting_output() {
         .success());
     assert_eq!(std::fs::read(output).unwrap(), b"preserve me");
 }
+
+#[test]
+fn cli_rejects_oversized_input_without_overwriting_output() {
+    const MAX_GRAPH_INPUT_BYTES: u64 = 8 * 1024 * 1024;
+
+    let directory = tempfile::tempdir().unwrap();
+    let input = directory.path().join("oversized.json");
+    let output = directory.path().join("routing.pack");
+    let input_file = std::fs::File::create(&input).unwrap();
+    input_file.set_len(MAX_GRAPH_INPUT_BYTES + 1).unwrap();
+    std::fs::write(&output, b"preserve me").unwrap();
+
+    let result = Command::new(env!("CARGO_BIN_EXE_build-pack"))
+        .arg(&input)
+        .arg(&output)
+        .output()
+        .unwrap();
+
+    assert!(!result.status.success());
+    assert!(
+        String::from_utf8_lossy(&result.stderr).contains("graph input exceeds 8 MiB limit"),
+        "unexpected stderr: {}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+    assert_eq!(std::fs::read(output).unwrap(), b"preserve me");
+}

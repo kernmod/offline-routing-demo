@@ -97,8 +97,8 @@ pnpm verify:live-api --url https://your-worker.workers.dev
   and publish payload;
 - hostile fixture tests for DEM provenance, checksum drift, no-data, and rebuild
   determinism;
-- Rust tests for `routeMany`, pack versioning, shortcut unpacking, ownership, and
-  browser/native boundary errors;
+- Rust tests for `routeMany`, pack versioning, shortcut unpacking, ownership,
+  bounded builder/WASM inputs, and browser/native boundary errors;
 - D1 integration tests for migrations, idempotency, conflict, TTL, rate-limit,
   bounded streaming request reads, the 10-record response cap, indexed cell query
   path, and exact bbox reads;

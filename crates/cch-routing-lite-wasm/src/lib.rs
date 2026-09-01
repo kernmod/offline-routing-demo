@@ -2,6 +2,11 @@ use cch_routing_lite::{Coordinate, Router, RouterError};
 use serde::Deserialize;
 use wasm_bindgen::prelude::*;
 
+/// Bounds work at the WASM boundary before `serde_json` can allocate. The
+/// router accepts at most 16 controls, so 16 KiB still leaves over 1 KiB per
+/// coordinate object—well above any ordinary finite `f64` representation.
+const MAX_CONTROLS_JSON_BYTES: usize = 16 * 1024;
+
 #[derive(Debug, Deserialize)]
 struct Control {
     lat: f64,
@@ -76,6 +81,11 @@ pub fn route_many_json(
     controls_json: &str,
     closed_loop: bool,
 ) -> Result<String, RouterError> {
+    if controls_json.len() > MAX_CONTROLS_JSON_BYTES {
+        return Err(RouterError::InvalidPack(format!(
+            "controls JSON exceeds {MAX_CONTROLS_JSON_BYTES}-byte limit"
+        )));
+    }
     let controls: Vec<Control> = serde_json::from_str(controls_json)
         .map_err(|error| RouterError::InvalidPack(error.to_string()))?;
     let coordinates = controls
@@ -147,5 +157,35 @@ mod tests {
 
         assert!(route_many_json(&router, "not json", false).is_err());
         assert!(route_many_json(&router, r#"[{"lat":-33.87,"lng":151.20}]"#, false).is_err());
+    }
+
+    #[test]
+    fn wasm_boundary_rejects_oversized_controls_json_before_parsing() {
+        let router = router_from_pack(&pack()).unwrap();
+        let oversized = format!(
+            r#"[{{"lat":-33.87,"lng":151.20}},{{"lat":-33.87,"lng":151.202}}{}]"#,
+            " ".repeat(16 * 1024)
+        );
+
+        let error = route_many_json(&router, &oversized, false).unwrap_err();
+
+        assert_eq!(
+            error.to_string(),
+            "invalid routing pack: controls JSON exceeds 16384-byte limit"
+        );
+    }
+
+    #[test]
+    fn wasm_boundary_accepts_a_compact_sixteen_control_payload() {
+        let router = router_from_pack(&pack()).unwrap();
+        let controls = std::iter::repeat_n(r#"{"lat":-33.87,"lng":151.20}"#, 16)
+            .collect::<Vec<_>>()
+            .join(",");
+
+        let json = route_many_json(&router, &format!("[{controls}]"), false).unwrap();
+        let value: serde_json::Value = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(value["controlCount"], 16);
+        assert_eq!(value["legs"].as_array().unwrap().len(), 15);
     }
 }

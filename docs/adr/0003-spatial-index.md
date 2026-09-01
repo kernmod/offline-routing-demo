@@ -23,7 +23,10 @@ join candidates to `segments`, then apply exact min/max intersection and TTL.
 ## Constraints
 
 - Geometry and query bboxes are limited to the public Sydney fixture.
-- A request is at most 16 KiB, 128 points, 64 stored cells, and 64 query cells.
+- The legacy endpoint accepts at most 16 KiB and 128 points. Route Studio `v2`
+  accepts at most 512 KiB, 4,096 geometry points, 16 controls, and returns at
+  most 10 detailed rows. Both versions retain the 64 stored-cell and 64
+  query-cell bounds.
 - User rows expire after 24 hours. The fixture seed is permanent and marked
   `is_seed = 1`.
 - The API stores a SHA-256 idempotency-key digest, never the caller's key. It

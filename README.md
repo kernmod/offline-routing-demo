@@ -118,6 +118,8 @@ also regenerate the pinned Rust/WASM output with path remapping and fail if it
 differs from the committed browser module. The WASM build jobs run on pinned
 Ubuntu 22.04 builders as well: `zstd-sys` compiles native C, so the compiler
 image is part of the reproducible toolchain alongside Rust and wasm-bindgen.
+Before deserialization, the public pack builder caps `graph.json` at 8 MiB and
+the WASM multipoint boundary caps its 2–16-control JSON at 16 KiB.
 
 ### Local app and viewer
 

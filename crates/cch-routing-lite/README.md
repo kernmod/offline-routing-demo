@@ -39,7 +39,9 @@ weighted grids, generated asymmetric graphs, and a connected Sydney fixture
 subset. A dedicated case proves that a one-arc CCH query expands to two
 original arcs. Other tests cover deterministic pack bytes, malformed packs,
 cost-domain bounds, bounded decompression, the five-megabyte fixture budget,
-snapping, CLI behavior, and the complete C ABI ownership contract.
+snapping, the builder's eight-megabyte pre-parse input bound, CLI behavior, and
+the complete C ABI ownership contract. The WASM adapter independently rejects
+control JSON above 16 KiB before deserialization.
 
 Production code contains no original-graph Dijkstra fallback. Its priority
 queue is constrained to serialized upward CCH arcs; the unrestricted reference
