@@ -49,7 +49,7 @@ if [[ "$(uname -s)" != "Darwin" ]]; then
   exit 69
 fi
 
-for command in cargo rustup lipo nm xcodebuild; do
+for command in cargo rustc rustup lipo xcodebuild; do
   command -v "${command}" >/dev/null 2>&1 || {
     printf 'error: required command is unavailable: %s\n' "${command}" >&2
     exit 69
@@ -63,6 +63,14 @@ export CARGO_TARGET_DIR="${RUST_TARGET_DIR}"
 export IPHONEOS_DEPLOYMENT_TARGET="${IPHONEOS_DEPLOYMENT_TARGET:-16.4}"
 
 rustup target add "${DEVICE_TARGET}" "${SIMULATOR_ARM_TARGET}" "${SIMULATOR_X86_TARGET}"
+rustup component add llvm-tools-preview
+
+RUST_HOST="$(rustc -vV | sed -n 's/^host: //p')"
+LLVM_NM="$(rustc --print sysroot)/lib/rustlib/${RUST_HOST}/bin/llvm-nm"
+test -x "${LLVM_NM}" || {
+  printf 'error: llvm-nm is missing after installing llvm-tools-preview: %s\n' "${LLVM_NM}" >&2
+  exit 69
+}
 
 build_target() {
   local target="$1"
@@ -78,7 +86,10 @@ verify_symbols() {
   local library="$1"
   local symbol
   local symbols
-  symbols="$(nm -gU "${library}")"
+  # Apple's nm in Xcode 16 cannot decode LLVM 21 object attributes emitted by
+  # Rust 1.94. Use the matching Rust toolchain's llvm-nm for deterministic
+  # symbol inspection across all three Apple archives.
+  symbols="$("${LLVM_NM}" --defined-only --extern-only "${library}")"
   for symbol in "${REQUIRED_SYMBOLS[@]}"; do
     if ! grep -q "${symbol}" <<<"${symbols}"; then
       printf 'error: %s does not define required symbol %s\n' "${library}" "${symbol}" >&2

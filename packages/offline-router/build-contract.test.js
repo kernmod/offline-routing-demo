@@ -81,13 +81,17 @@ test("ios packaging builds public Rust libraries into a required XCFramework", (
   assert.match(script, /IPHONEOS_DEPLOYMENT_TARGET.*16\.4/);
   assert.match(script, /offline-routing-mobile-core/);
   assert.match(script, /offline_routing_mobile_core_symbol_anchor/);
-  assert.match(script, /nm /);
+  assert.match(script, /rustc --print sysroot/);
+  assert.match(script, /bin\/llvm-nm/);
+  assert.match(script, /llvm-tools-preview/);
+  assert.doesNotMatch(script, /symbols="\$\(nm /);
   assert.match(script, /xcodebuild -create-xcframework/);
   assert.match(script, /--print-plan/);
   const printedPlan = execFileSync("bash", [resolve(packageRoot, "scripts/build-ios-rust-xcframework.sh"), "--print-plan"], { encoding: "utf8" });
   assert.match(printedPlan, /one Rust staticlib: offline-routing-mobile-core/);
   assert.match(printedPlan, /required symbols:.*routing_router_route.*offline_tiles_start/s);
   assert.match(workflow, /runs-on: macos-15/);
+  assert.match(workflow, /components: llvm-tools-preview/);
   assert.match(workflow, /build-ios-rust-xcframework\.sh/);
   assert.match(workflow, /CODE_SIGNING_ALLOWED=NO/);
   assert.match(workflow, /iphonesimulator/);
