@@ -241,10 +241,12 @@ Package scripts mirror those commands:
 - `pnpm --dir apps/mobile run submit:ios-testflight`
 
 The signed packaging evidence is
-[`docs/evidence/2026-09-01T08-44-36Z-ios-eas-signed-build.md`](docs/evidence/2026-09-01T08-44-36Z-ios-eas-signed-build.md):
+[`docs/evidence/2026-09-01T10-37-26Z-ios-eas-elevation-cut-build.md`](docs/evidence/2026-09-01T10-37-26Z-ios-eas-elevation-cut-build.md):
 EAS completed a real `arm64` ad hoc build for `dev.offlinerouting.demo` from the
-public commit, using its own App ID/profile and one enrolled test device. The
-earlier credential-bootstrap attempt remains recorded in
+shared-selector commit, using its own App ID/profile and one enrolled test device.
+The earlier signed packaging baseline remains recorded in
+[`docs/evidence/2026-09-01T08-44-36Z-ios-eas-signed-build.md`](docs/evidence/2026-09-01T08-44-36Z-ios-eas-signed-build.md),
+and the credential-bootstrap attempt remains recorded in
 [`docs/evidence/2026-09-01T07-51-19Z-ios-eas-attempt.md`](docs/evidence/2026-09-01T07-51-19Z-ios-eas-attempt.md).
 
 The ad hoc IPA stays in EAS instead of becoming a public GitHub release asset:
