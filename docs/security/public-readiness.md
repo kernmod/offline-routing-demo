@@ -13,11 +13,12 @@ verification is closed on the deployed `main` baseline.
   longer mention private map/game chunk formats.
 - gitleaks `v8.28.0` reports no leak on the publication file set or reachable
   public Git history; the scan is repeated before each publication commit.
-- `docs/evidence/2026-09-01T01-12-40Z-release-device.txt` records the current
-  release-device gate on `localhost:5556`.
-- `docs/benchmarks/2026-09-01T01-20-28Z.json` records the current Nitro/native
-  benchmark on `redroid14_x86_64 isolated (AX102)`: cold pack load 97,380 µs,
-  warm p50 1,183 µs, warm p95 1,641 µs across 1,024 queries.
+- `docs/evidence/2026-09-01T01-25-11Z-release-device.txt` records the published
+  `v0.2.0` APK gate on `redroid14_x86_64` in airplane mode; its digest matches
+  the GitHub Release asset.
+- `docs/benchmarks/2026-09-01T01-42-17Z.json` records the current Nitro/native
+  benchmark on `redroid14_x86_64 isolated (AX102)`: cold pack load 98,827 µs,
+  warm p50 1,182 µs, warm p95 1,624 µs across 1,024 queries.
 - `docs/testing.md` records the TDD contract and the latest local coverage values.
 - `pnpm audit:dependencies` blocks every critical/high advisory except two
   exact upstream `image-size` advisories with no patched release

@@ -137,7 +137,10 @@ ANDROID_SERIAL=localhost:5556 \
 ```
 
 The build generates a demo keystore under `$HOME` only. No signing material is
-committed.
+committed. The published `v0.2.0` asset has SHA-256
+`aa7731a3917bba6351b47e1b0c12a16ba17bcfa41cca32f985f0b3cef10854d1`;
+its airplane-mode device gate is recorded in
+[`docs/evidence/2026-09-01T01-25-11Z-release-device.txt`](docs/evidence/2026-09-01T01-25-11Z-release-device.txt).
 
 ### Benchmarks
 
@@ -151,7 +154,7 @@ The benchmark exercises the production Nitro/C++/Rust path with a fixed
 1,024-query corpus and records cold-load plus warm-query p50/p95 on the named
 device only.
 
-Release-gate named-device run on 2026-09-01T01:42:17Z:
+Named-device benchmark run on 2026-09-01T01:42:17Z:
 
 - device: `redroid14_x86_64 isolated (AX102)`
 - warm-query p50: `1,182 µs`
