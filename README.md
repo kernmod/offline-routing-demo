@@ -1,14 +1,34 @@
 # Offline Routing Demo
 
-This repository is a public Route Studio built to show end-to-end engineering
-without exposing product-specific logic. It packages one reproducible Sydney
-fixture, one Rust CCH routing engine, one shared editing state machine, an
-offline-first Android client, a public iOS build path, an install-free web
-client, and a bounded publish/read API. The public cartography includes a
-neutral 3D/stylized map based on regenerated public fixture bytes, not on any
-private map artifact.
+Offline Routing Demo is a deliberately isolated public package of an offline
+routing and map-editing subsystem developed while I worked full-time for nearly
+a year on a larger private geospatial product. Its Sydney fixture, product-neutral
+UI, API surface, and release pipelines were rebuilt for publication so the
+system can be inspected and run without private data, terminology, or
+infrastructure.
 
-The recruiter flow is simple:
+[![Android Route Studio running locally in 3D while both elevation-cut handles are dragged](docs/media/offline-routing-demo.gif)](https://kernmod.github.io/offline-routing-demo/)
+
+One Rust CCH router runs in three environments:
+
+- native Android through Nitro/C++;
+- native iOS through the same ABI packaged as an XCFramework;
+- the browser through WASM, with no routing server or JavaScript graph fallback.
+
+The result is a small but complete Route Studio: multipoint editing, selective
+leg recalculation, undo/redo, optional loops, elevation-aware non-destructive
+trimming, explicit publication, and immediate read-back from a live API.
+
+## Try the complete flow
+
+- Browser viewer: <https://kernmod.github.io/offline-routing-demo/>
+- Android APK: <https://github.com/kernmod/offline-routing-demo/releases/latest/download/offline-routing-demo-route-studio.apk>
+- Segment API health: <https://offline-routing-segments.yaktrak.workers.dev/health>
+- iOS Simulator app: <https://github.com/kernmod/offline-routing-demo/releases/latest/download/offline-routing-demo-ios-simulator-app.zip>
+- Reproducible iOS run: [GitHub Actions workflow `ios`](https://github.com/kernmod/offline-routing-demo/actions/workflows/ios.yml)
+- Physical iOS distribution: [GitHub Actions workflow `ios-distribution`](https://github.com/kernmod/offline-routing-demo/actions/workflows/ios-distribution.yml)
+
+Try it in five steps:
 
 1. open the web viewer, install the APK, or inspect the iOS simulator build;
 2. create a route with start, finish, and via points;
@@ -19,17 +39,6 @@ The recruiter flow is simple:
 The public boundary is strict. There is no account system, no hosted routing
 endpoint, no private drafts on the server, no private infrastructure dependency,
 and no business vocabulary or artifacts from the product repo.
-
-## Try the complete flow
-
-- Browser viewer: <https://kernmod.github.io/offline-routing-demo/>
-- Segment API health: <https://offline-routing-segments.yaktrak.workers.dev/health>
-- Android APK: <https://github.com/kernmod/offline-routing-demo/releases/latest/download/offline-routing-demo-route-studio.apk>
-- iOS Simulator app: <https://github.com/kernmod/offline-routing-demo/releases/latest/download/offline-routing-demo-ios-simulator-app.zip>
-- iOS Rust XCFramework: <https://github.com/kernmod/offline-routing-demo/releases/latest/download/offline-routing-demo-ios-rust-xcframework.zip>
-- iOS runtime evidence: <https://github.com/kernmod/offline-routing-demo/releases/latest/download/offline-routing-demo-ios-simulator-evidence.zip>
-- Reproducible macOS run: [GitHub Actions workflow `ios`](https://github.com/kernmod/offline-routing-demo/actions/workflows/ios.yml)
-- Physical iOS EAS rail: [GitHub Actions workflow `ios-distribution`](https://github.com/kernmod/offline-routing-demo/actions/workflows/ios-distribution.yml)
 
 ## What this demonstrates
 
