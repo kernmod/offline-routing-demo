@@ -1,4 +1,4 @@
-internal import Expo
+import Expo
 import React
 import ReactAppDependencyProvider
 
@@ -19,12 +19,14 @@ class AppDelegate: ExpoAppDelegate {
 
     reactNativeDelegate = delegate
     reactNativeFactory = factory
+    bindReactNativeFactory(factory)
 
 #if os(iOS) || os(tvOS)
     window = UIWindow(frame: UIScreen.main.bounds)
     factory.startReactNative(
       withModuleName: "main",
       in: window,
+      initialProperties: verificationInitialProperties(),
       launchOptions: launchOptions)
 #endif
 
@@ -37,7 +39,8 @@ class AppDelegate: ExpoAppDelegate {
     open url: URL,
     options: [UIApplication.OpenURLOptionsKey: Any] = [:]
   ) -> Bool {
-    return super.application(app, open: url, options: options) || RCTLinkingManager.application(app, open: url, options: options)
+    let result = RCTLinkingManager.application(app, open: url, options: options)
+    return super.application(app, open: url, options: options) || result
   }
 
   // Universal Links
@@ -48,6 +51,22 @@ class AppDelegate: ExpoAppDelegate {
   ) -> Bool {
     let result = RCTLinkingManager.application(application, continue: userActivity, restorationHandler: restorationHandler)
     return super.application(application, continue: userActivity, restorationHandler: restorationHandler) || result
+  }
+
+  private func verificationInitialProperties() -> [AnyHashable: Any]? {
+#if targetEnvironment(simulator)
+    let arguments = ProcessInfo.processInfo.arguments
+    guard let flagIndex = arguments.firstIndex(of: "--offline-routing-verification-route") else {
+      return nil
+    }
+    let valueIndex = arguments.index(after: flagIndex)
+    guard valueIndex < arguments.endIndex else {
+      return nil
+    }
+    return ["verificationRouteUrl": arguments[valueIndex]]
+#else
+    return nil
+#endif
   }
 }
 

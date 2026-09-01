@@ -154,6 +154,7 @@ test("style has no remote URL and uses the embedded PMTiles archive", () => {
   assert.equal(extrusion?.["source-layer"], "buildings");
   assert.match(JSON.stringify(extrusion.paint), /render_height/);
   assert.match(JSON.stringify(extrusion.paint), /render_min_height/);
+  assert.ok(extrusion.paint["fill-extrusion-opacity"] <= 0.58, "3D buildings must not hide route overlays");
 });
 
 test("licence and provenance files are explicit", () => {

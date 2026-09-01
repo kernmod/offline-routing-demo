@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import { resolve } from "node:path";
 import test from "node:test";
 
@@ -47,6 +48,72 @@ test("android packaging builds Rust shared objects into a generated build direct
   assert.match(kotlin, /System\.loadLibrary\("cch_routing_lite_ffi"\)/);
   assert.match(kotlin, /System\.loadLibrary\("tile_server_lite"\)/);
   assert.match(kotlin, /OfflineRouterOnLoad\.initializeNative\(\)/);
+});
+
+test("ios packaging builds public Rust libraries into a required XCFramework", () => {
+  const podspec = read("OfflineRouter.podspec");
+  const script = read("scripts/build-ios-rust-xcframework.sh");
+  const workflow = read("../../.github/workflows/ios.yml");
+  const readme = read("../../README.md");
+  const simulatorScript = read("scripts/verify-ios-simulator.sh");
+  const podfile = read("../../apps/mobile/ios/Podfile");
+  const workspaceCargo = read("../../Cargo.toml");
+  const aggregatorCargo = read("../../crates/offline-routing-mobile-core/Cargo.toml");
+  const aggregatorLib = read("../../crates/offline-routing-mobile-core/src/lib.rs");
+
+  assert.match(podspec, /spec\.source_files = \[/);
+  assert.match(podspec, /spec\.homepage = 'https:\/\/github\.com\/kernmod\/offline-routing-demo'/);
+  assert.match(podspec, /cpp\/\*\*\/\*\.\{hpp,cpp\}/);
+  assert.match(podspec, /add_nitrogen_files\(spec\)/);
+  assert.match(podspec, /spec\.vendored_frameworks = 'ios\/OfflineRouterCore\.xcframework'/);
+  assert.match(podspec, /spec\.platforms = \{ :ios => '16\.4' \}/);
+  assert.match(podspec, /Check OfflineRouterCore\.xcframework/);
+  assert.match(podspec, /load 'nitrogen\/generated\/ios\/OfflineRouter\+autolinking\.rb'/);
+  assert.match(readme, /local-path integration, not a\s+CocoaPods registry package/);
+  assert.match(readme, /releases\/latest\/download\/offline-routing-demo-route-studio\.apk/);
+  assert.match(readme, /releases\/latest\/download\/offline-routing-demo-ios-simulator-app\.zip/);
+  assert.match(readme, /releases\/latest\/download\/offline-routing-demo-ios-rust-xcframework\.zip/);
+  assert.match(readme, /releases\/latest\/download\/offline-routing-demo-ios-simulator-evidence\.zip/);
+  assert.match(workspaceCargo, /crates\/offline-routing-mobile-core/);
+  assert.match(aggregatorCargo, /name = "offline-routing-mobile-core"/);
+  assert.match(aggregatorCargo, /crate-type = \["rlib", "staticlib"\]/);
+  assert.match(aggregatorCargo, /cch-routing-lite-ffi/);
+  assert.match(aggregatorCargo, /tile-server-lite/);
+  assert.match(aggregatorLib, /offline_routing_mobile_core_symbol_anchor/);
+  assert.match(aggregatorLib, /routing_router_load/);
+  assert.match(aggregatorLib, /offline_tiles_start/);
+  assert.match(script, /aarch64-apple-ios/);
+  assert.match(script, /aarch64-apple-ios-sim/);
+  assert.match(script, /x86_64-apple-ios/);
+  assert.match(script, /IPHONEOS_DEPLOYMENT_TARGET.*16\.4/);
+  assert.match(script, /offline-routing-mobile-core/);
+  assert.match(script, /offline_routing_mobile_core_symbol_anchor/);
+  assert.match(script, /rustc --print sysroot/);
+  assert.match(script, /bin\/llvm-nm/);
+  assert.match(script, /llvm-tools-preview/);
+  assert.doesNotMatch(script, /symbols="\$\(nm /);
+  assert.match(script, /grep -Fxq/);
+  assert.doesNotMatch(script, /grep -q "\$\{symbol\}"/);
+  assert.match(script, /xcodebuild -create-xcframework/);
+  assert.match(script, /--print-plan/);
+  const printedPlan = execFileSync("bash", [resolve(packageRoot, "scripts/build-ios-rust-xcframework.sh"), "--print-plan"], { encoding: "utf8" });
+  assert.match(printedPlan, /one Rust staticlib: offline-routing-mobile-core/);
+  assert.match(printedPlan, /required symbols:.*routing_router_route.*offline_tiles_start/s);
+  assert.match(workflow, /runs-on: macos-15/);
+  assert.match(workflow, /components: llvm-tools-preview/);
+  assert.match(workflow, /build-ios-rust-xcframework\.sh/);
+  assert.match(workflow, /CODE_SIGNING_ALLOWED=NO/);
+  assert.match(workflow, /iphonesimulator/);
+  assert.match(workflow, /upload-artifact/);
+  assert.match(workflow, /verify-ios-simulator\.sh/);
+  assert.match(simulatorScript, /xcrun simctl bootstatus/);
+  assert.match(simulatorScript, /xcrun simctl install/);
+  assert.match(simulatorScript, /--offline-routing-verification-route/);
+  assert.doesNotMatch(simulatorScript, /xcrun simctl openurl/);
+  assert.match(simulatorScript, /OfflineRoutingRoute/);
+  assert.match(simulatorScript, /routeSource.*local_native/);
+  assert.match(simulatorScript, /networkAttempts.*0/);
+  assert.match(podfile, /use_native_modules!/);
 });
 
 test("the C++ bridge consumes the checked C ABI and frees failure buffers", () => {

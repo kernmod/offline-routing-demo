@@ -4,6 +4,8 @@ This repository uses strict TDD. Each Route Studio surface started with a
 focused failing test, then moved through the smallest green implementation,
 refactor, coverage gate, and independent audit/review pass.
 The test pyramid combines unit, property, integration, E2E, and device checks.
+The iOS surface keeps the same rule: contracts first on Linux, runtime proof on
+macOS where Xcode and the simulator actually exist.
 
 ## Coverage contract
 
@@ -62,9 +64,10 @@ The Route Studio build order is enforced by tests:
 | P2 fixture coverage | `node --test tools/fixtures/*.test.mjs` via root gate | hostile fixture coverage retained in root gate | green |
 | P3 Rust native/FFI | `cargo test --workspace` | Rust core, FFI, WASM, tile server all pass | green |
 | P4 WASM build | `pnpm build:wasm` + committed-output diff gate | pinned Rust 1.94.1, wasm-bindgen 0.2.127, isolated cold target, stable path remapping, and Ubuntu 22.04 build image regenerate byte-identical browser output in local build, CI, and Pages | green |
-| P4 viewer parity | `pnpm --filter @offline-routing/viewer test:coverage` | 44 tests, 95.61% lines, 84.21% branches, 92.85% funcs, including real generated-WASM parity, strict publication-response validation, and 2D/3D cartography checks | green |
+| P4 viewer parity | `pnpm --filter @offline-routing/viewer test:coverage` | 46 tests, including real generated-WASM parity, strict publication-response validation, high-contrast 2D/3D cartography, and full-casing hit testing | green |
 | P5 API | `pnpm --filter @offline-routing/api test:coverage` | 29 tests, 99.29% lines, 90.63% branches, 100% funcs | green |
-| P6 mobile package | `pnpm coverage:mobile` | 49 tests, 95.55% lines, 83.93% branches, 90.76% funcs | green |
+| P6 mobile package | `pnpm coverage:mobile` | 51 tests, 95.55% lines, 83.93% branches, 90.76% funcs | green |
+| P6b iOS package contract | `node --test packages/offline-router/build-contract.test.js tools/audit/ios-workflow.test.mjs` | 5/5 pass for podspec, Rust aggregator, XCFramework script, simulator verifier, and macOS workflow contract | green |
 | P7 browser E2E | `pnpm --filter @offline-routing/viewer test:e2e` | 8/8 pass desktop + mobile viewport, including the 2D/3D cartography flow | green |
 | P8 root coverage | `pnpm test:coverage` | LCOV_OK for root, mobile, offline-router, api, viewer, and shared | green |
 | P8 Rust coverage | `cargo llvm-cov --workspace --all-targets --exclude cch-routing-lite-wasm --fail-under-lines 80` | `coverage/rust.lcov` regenerated; the browser-only WASM crate stays covered by `pnpm build:wasm` and viewer parity/E2E gates | green |
@@ -88,6 +91,7 @@ cargo llvm-cov --workspace --all-targets --exclude cch-routing-lite-wasm --fail-
 make fixture
 make verify-fixture
 pnpm audit:public
+node --test packages/offline-router/build-contract.test.js tools/audit/ios-workflow.test.mjs
 pnpm verify:live-api --url https://your-worker.workers.dev
 ```
 
@@ -106,4 +110,6 @@ pnpm verify:live-api --url https://your-worker.workers.dev
   mobile viewport accessibility, 2D/3D toggle, and extrusion presence;
 - mobile controller tests for offline editing, retry, persistence, and network
   quarantine, plus the native 2D/3D switch accessible control;
+- iOS packaging contract tests for the single-archive Rust link unit, the
+  fail-loud CocoaPods boundary, and the simulator smoke script/workflow;
 - device scripts for airplane-mode boot, local route, and benchmark logging.

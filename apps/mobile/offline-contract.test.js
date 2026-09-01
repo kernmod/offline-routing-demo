@@ -110,6 +110,35 @@ test("mobile map exposes a local 2D/3D cartography mode", () => {
   assert.match(source, /androidView="texture"/);
 });
 
+test("mobile route overlays use a high-contrast layer stack over 3D buildings", () => {
+  const source = read("App.tsx");
+  assert.match(source, /id="route-shadow-line"/);
+  assert.match(source, /id="route-casing-line"/);
+  assert.match(source, /id="route-line"/);
+  assert.match(source, /id="selected-route-shadow-line"/);
+  assert.match(source, /id="selected-route-casing-line"/);
+  assert.match(source, /id="selected-route-line"/);
+  assert.match(source, /id="control-point-halo"/);
+  assert.match(source, /id="profile-cursor-halo"/);
+  assert.ok(source.indexOf('id="route-shadow-line"') < source.indexOf('id="route-casing-line"'));
+  assert.ok(source.indexOf('id="route-casing-line"') < source.indexOf('id="route-line"'));
+  assert.ok(source.indexOf('id="selected-route-shadow-line"') < source.indexOf('id="selected-route-casing-line"'));
+  assert.ok(source.indexOf('id="selected-route-casing-line"') < source.indexOf('id="selected-route-line"'));
+  assert.match(source, /"line-color": "#111611"/);
+  assert.match(source, /"line-color": "#f7ead0"/);
+  assert.match(source, /"line-color": "#f2b36f"/);
+  assert.match(source, /"line-color": "#c4663a"/);
+  assert.match(source, /"line-blur": 1/);
+  assert.match(source, /"line-width": 16/);
+  assert.match(source, /"line-width": 13/);
+  assert.match(source, /"line-width": 12/);
+  assert.match(source, /"line-width": 10/);
+  assert.match(source, /"line-width": 6/);
+  assert.match(source, /"circle-radius": 11/);
+  assert.match(source, /"circle-radius": 8/);
+  assert.match(source, /"circle-radius": 5/);
+});
+
 test("network capability is quarantined behind the explicit publish and refresh actions", () => {
   const source = read("src/networkApi.ts");
   assert.match(source, /export async function publishSegment/);
@@ -125,6 +154,43 @@ test("the native package exposes only router and local tile-server operations", 
   assert.match(source, /benchmark/);
   assert.match(source, /startTileServer/);
   assert.doesNotMatch(source, /sensor|location|account|wallet|motion/i);
+});
+
+test("the native package exposes the same routing-only Nitro surface on iOS", () => {
+  const podspec = read("../../packages/offline-router/OfflineRouter.podspec");
+  const buildContract = read("../../packages/offline-router/build-contract.test.js");
+  const infoPlist = read("ios/mobile/Info.plist");
+  const appDelegate = read("ios/mobile/AppDelegate.swift");
+  const podfile = read("ios/Podfile");
+  const appConfig = JSON.parse(read("app.json"));
+  assert.match(podspec, /ios\/OfflineRouterCore\.xcframework/);
+  assert.match(podspec, /OfflineRouter\+autolinking\.rb/);
+  assert.match(podspec, /-x objective-c\+\+/);
+  assert.match(podspec, /Check OfflineRouterCore\.xcframework/);
+  assert.match(buildContract, /build-ios-rust-xcframework\.sh/);
+  assert.match(infoPlist, /CFBundleURLTypes/);
+  assert.match(infoPlist, /offlineroutingdemo/);
+  assert.match(infoPlist, /NSAllowsLocalNetworking/);
+  assert.match(appDelegate, /^import Expo$/m);
+  assert.doesNotMatch(appDelegate, /^internal import Expo$/m);
+  assert.match(appDelegate, /bindReactNativeFactory\(factory\)/);
+  assert.ok(appDelegate.indexOf("bindReactNativeFactory(factory)") < appDelegate.indexOf("factory.startReactNative("));
+  assert.match(appDelegate, /#if targetEnvironment\(simulator\)/);
+  assert.match(appDelegate, /--offline-routing-verification-route/);
+  assert.match(appDelegate, /initialProperties: verificationInitialProperties\(\)/);
+  assert.match(appDelegate, /let result = RCTLinkingManager\.application\(app, open: url, options: options\)/);
+  assert.doesNotMatch(appDelegate, /return super\.application\(app, open: url, options: options\) \|\| RCTLinkingManager/);
+  assert.match(podfile, /\$MLRN\.post_install\(installer\)/);
+  assert.ok(appConfig.expo.plugins.includes("@maplibre/maplibre-react-native"));
+});
+
+test("the iOS simulator verifier injects its deterministic route without a system URL dialog", () => {
+  const verifier = read("../../packages/offline-router/scripts/verify-ios-simulator.sh");
+  const app = read("App.tsx");
+  assert.match(verifier, /--offline-routing-verification-route/);
+  assert.doesNotMatch(verifier, /simctl openurl/);
+  assert.match(app, /verificationRouteUrl\?: string/);
+  assert.match(app, /handleDeepLink\(verificationRouteUrl/);
 });
 
 test("no JavaScript graph or shortest-path implementation is shipped beside the native bridge", () => {

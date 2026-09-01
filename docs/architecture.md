@@ -1,10 +1,10 @@
 # Architecture
 
 Status on 2026-09-01: Route Studio `v1.1` is verified across the shared
-domain, Rust/native, Rust/WASM, Worker/D1, mobile, browser, and live public
-deployment surfaces. The public production URLs now serve the `v1.1` contract
-from the deployed `main` baseline. The same public fixture also now supports a
-neutral 2D/3D cartography mode with building extrusion in both clients.
+domain, Rust/native, Rust/WASM, Worker/D1, Android, browser, and live public
+deployment surfaces. The same public fixture now also has a public iOS build
+path through the same Nitro/C++ bridge and a single Rust XCFramework input.
+The public production URLs now serve the `v1.1` contract from the deployed `main` baseline, and both clients support a neutral 2D/3D cartography mode with building extrusion.
 
 ## System shape
 
@@ -67,6 +67,7 @@ profile and D+/D- reporting after unpack. It never changes routing cost.
 The same pack is consumed by:
 
 - `packages/offline-router` through Nitro/native on Android;
+- `packages/offline-router` through the same Nitro/native surface on iOS;
 - `crates/cch-routing-lite-wasm` in the browser.
 
 Golden tests enforce parity on the same fixture and pack.
@@ -85,6 +86,25 @@ The Android build removes location and legacy storage permissions. Release
 verification checks airplane mode, app startup, back handling, and a local route
 deep-link without network dependency.
 
+For iOS, the same app uses:
+
+- one CocoaPods package for `packages/offline-router`;
+- local-path CocoaPods integration only: the repository builds its ignored
+  XCFramework from source before `pod install`; it is not distributed through
+  the CocoaPods registry;
+- one required vendored framework, `OfflineRouterCore.xcframework`;
+- one Rust `staticlib` aggregator, `crates/offline-routing-mobile-core`, so the
+  app links a single Rust archive rather than two independent Rust static
+  libraries;
+- one simulator smoke gate that boots a named iPhone simulator, installs the
+  unsigned Release app, injects a deterministic simulator-only route property,
+  and checks the log evidence for `routeSource:"local_native"` and
+  `networkAttempts":0`. The launch property avoids the iOS 26 custom-scheme
+  confirmation dialog; the regular public deep link remains enabled.
+
+Physical-device signing stays out of scope for the public repo. The CI proof is
+the unsigned simulator build and runtime evidence on macOS.
+
 ## Web path
 
 `apps/viewer` loads the same pack and a WASM router at runtime. The map is
@@ -99,7 +119,9 @@ editable immediately:
 
 Both clients expose a visible 2D/3D toggle. The 3D mode uses public fixture
 data only: MapLibre fill-extrusion layers for buildings, a stylized neutral
-palette, and local PMTiles assets. Terrain is intentionally not activated; the
+palette, and local PMTiles assets. The route overlays use a shared contrast
+contract: dark shadow, paper casing, ochre route core, and dedicated halos for
+selected trims and profile cursors. Terrain is intentionally not activated; the
 elevation profile remains a route metric, not a terrain renderer.
 
 Playwright asserts that these flows work on both desktop and mobile viewport and

@@ -5,6 +5,9 @@
     "scheme": "offlineroutingdemo",
     "version": "1.0.0",
     "orientation": "portrait",
+    "plugins": [
+      "@maplibre/maplibre-react-native"
+    ],
     "android": {
       "package": "dev.offlinerouting.demo",
       "intentFilters": [
@@ -29,6 +32,8 @@
         "android.permission.WRITE_EXTERNAL_STORAGE"
       ]
     },
-    "ios": { "bundleIdentifier": "dev.offlinerouting.demo" }
+    "ios": {
+      "bundleIdentifier": "dev.offlinerouting.demo"
+    }
   }
 }
