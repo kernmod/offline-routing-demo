@@ -3,6 +3,7 @@ set -euo pipefail
 
 demo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 abis="${ANDROID_ABIS:-arm64-v8a,x86_64}"
+node22_bin="$(dirname "$(npx -y node@22 -p 'process.execPath')")"
 release_dir="${HOME}/.offline-routing-demo/releases"
 release_intermediates_sourcemap_dir="$demo_root/apps/mobile/android/app/build/intermediates/sourcemaps/react/release"
 release_generated_sourcemap_dir="$demo_root/apps/mobile/android/app/build/generated/sourcemaps/react/release"
@@ -38,7 +39,8 @@ if [[ ! -f "$keystore" ]]; then
 fi
 
 cd "$demo_root/apps/mobile/android"
-NODE_ENV=production ./gradlew --no-daemon --max-workers=1 "-PreactNativeArchitectures=$abis" clean assembleRelease --rerun-tasks
+PATH="$node22_bin:$PATH" NODE_ENV=production ./gradlew --no-daemon --max-workers=1 "-PreactNativeArchitectures=$abis" clean
+PATH="$node22_bin:$PATH" NODE_ENV=production ./gradlew --no-daemon --max-workers=1 "-PreactNativeArchitectures=$abis" assembleRelease --rerun-tasks
 apk_source="$demo_root/apps/mobile/android/app/build/outputs/apk/release/app-release.apk"
 mkdir -p "$release_dir"
 apk_target="$release_dir/offline-routing-demo-route-studio.apk"
@@ -50,3 +52,4 @@ clean_release_transients
 echo "Demo APK copied to: $apk_target"
 echo "SHA256 recorded in: $apk_target.sha256"
 echo "It is signed with a generated demo keystore under \$HOME only; no keystore is versioned."
+echo "Release bundling is pinned to Node 22 via the local \`node@22\` binary."

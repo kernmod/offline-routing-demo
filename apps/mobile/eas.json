@@ -1,0 +1,37 @@
+{
+  "cli": {
+    "version": ">= 23.2.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "ios-internal": {
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_SEGMENTS_API_URL": "https://offline-routing-segments.yaktrak.workers.dev"
+      },
+      "ios": {
+        "credentialsSource": "remote",
+        "resourceClass": "m-medium"
+      }
+    },
+    "ios-testflight": {
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_SEGMENTS_API_URL": "https://offline-routing-segments.yaktrak.workers.dev"
+      },
+      "ios": {
+        "credentialsSource": "remote",
+        "resourceClass": "m-medium"
+      }
+    },
+    "ios-simulator": {
+      "extends": "ios-internal",
+      "ios": {
+        "simulator": true
+      }
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}

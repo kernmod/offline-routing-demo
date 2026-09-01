@@ -1,34 +1,45 @@
 # Offline Routing Demo
 
-This repository is a public Route Studio built to show end-to-end engineering
-without exposing product-specific logic. It packages one reproducible Sydney
-fixture, one Rust CCH routing engine, one shared editing state machine, an
-offline-first Android client, a public iOS build path, an install-free web
-client, and a bounded publish/read API. The public cartography includes a
-neutral 3D/stylized map based on regenerated public fixture bytes, not on any
-private map artifact.
+Offline Routing Demo is a deliberately isolated public package of an offline
+routing and map-editing subsystem developed while I worked full-time for nearly
+a year on a larger private geospatial product. Its Sydney fixture, product-neutral
+UI, API surface, and release pipelines were rebuilt for publication so the
+system can be inspected and run without private data, terminology, or
+infrastructure.
 
-The recruiter flow is simple:
+[![Android Route Studio running locally in 3D while both elevation-cut handles are dragged](docs/media/offline-routing-demo.gif)](https://kernmod.github.io/offline-routing-demo/)
+
+One Rust CCH router runs in three environments:
+
+- native Android through Nitro/C++;
+- native iOS through the same ABI packaged as an XCFramework;
+- the browser through WASM, with no routing server or JavaScript graph fallback.
+
+The result is a small but complete Route Studio: multipoint editing, selective
+leg recalculation, undo/redo, optional loops, elevation-aware non-destructive
+trimming, explicit publication, and immediate read-back from a live API.
+
+## Try the complete flow
+
+- Browser viewer: <https://kernmod.github.io/offline-routing-demo/>
+- Android APK: <https://github.com/kernmod/offline-routing-demo/releases/latest/download/offline-routing-demo-route-studio.apk>
+- Segment API health: <https://offline-routing-segments.yaktrak.workers.dev/health>
+- iOS Simulator app: <https://github.com/kernmod/offline-routing-demo/releases/latest/download/offline-routing-demo-ios-simulator-app.zip>
+- iOS build artifacts: [Rust XCFramework](https://github.com/kernmod/offline-routing-demo/releases/latest/download/offline-routing-demo-ios-rust-xcframework.zip) · [simulator evidence](https://github.com/kernmod/offline-routing-demo/releases/latest/download/offline-routing-demo-ios-simulator-evidence.zip)
+- Reproducible iOS run: [GitHub Actions workflow `ios`](https://github.com/kernmod/offline-routing-demo/actions/workflows/ios.yml)
+- Physical iOS distribution: [GitHub Actions workflow `ios-distribution`](https://github.com/kernmod/offline-routing-demo/actions/workflows/ios-distribution.yml)
+
+Try it in five steps:
 
 1. open the web viewer, install the APK, or inspect the iOS simulator build;
 2. create a route with start, finish, and via points;
-3. inspect the local route, elevation profile, trim selection, and 2D/3D map mode;
+3. inspect the local route, drag the elevation cut handles, and switch 2D/3D map mode;
 4. confirm publication of a named snapshot;
 5. read the same published segment back through the live API.
 
 The public boundary is strict. There is no account system, no hosted routing
 endpoint, no private drafts on the server, no private infrastructure dependency,
 and no business vocabulary or artifacts from the product repo.
-
-## Try the complete flow
-
-- Browser viewer: <https://kernmod.github.io/offline-routing-demo/>
-- Segment API health: <https://offline-routing-segments.yaktrak.workers.dev/health>
-- Android APK: <https://github.com/kernmod/offline-routing-demo/releases/latest/download/offline-routing-demo-route-studio.apk>
-- iOS Simulator app: <https://github.com/kernmod/offline-routing-demo/releases/latest/download/offline-routing-demo-ios-simulator-app.zip>
-- iOS Rust XCFramework: <https://github.com/kernmod/offline-routing-demo/releases/latest/download/offline-routing-demo-ios-rust-xcframework.zip>
-- iOS runtime evidence: <https://github.com/kernmod/offline-routing-demo/releases/latest/download/offline-routing-demo-ios-simulator-evidence.zip>
-- Reproducible macOS run: [GitHub Actions workflow `ios`](https://github.com/kernmod/offline-routing-demo/actions/workflows/ios.yml)
 
 ## What this demonstrates
 
@@ -39,6 +50,9 @@ and no business vocabulary or artifacts from the product repo.
 - one shared `packages/route-studio` domain for multipoint editing, invalidated-leg
   reroute, undo/redo, loop, trim, elevation metrics, draft persistence, and explicit
   `draft -> ready -> publishing -> published` transitions;
+- one direct elevation-cut interaction on mobile and web: the web uses native
+  ranges, while Android and iOS share a React Native SVG profile selector with
+  tactile start/end handles and the same non-destructive trim state;
 - a Cloudflare Worker + D1 API with exact input validation, idempotency, server-derived
   metrics, z14 spatial cells, TTL, and fail-closed rate limiting;
 - TDD with unit, integration, E2E, device, coverage, and public-boundary checks.
@@ -148,7 +162,11 @@ fails if a `/route` request appears on the network. The map starts in 3D and
 can be switched to 2D without breaking route overlays. In both clients, the
 active route uses a three-layer stack: dark shadow, paper casing, and ochre
 core. Selected trims and profile cursors use their own halo so the route stays
-visible over 3D building extrusion.
+visible over 3D building extrusion. On mobile, the elevation chart is a direct
+SVG range selector: tap the profile to inspect it, or drag its dedicated
+start/end handles to preview the selected geometry and D+/D- immediately. The
+trim is persisted once when the gesture ends. The 44 pt handle targets and
+adjustable accessibility actions are shared by the Android APK and iOS app.
 
 ### iOS simulator path
 
@@ -184,8 +202,60 @@ The iOS packaging path is intentionally public and narrow:
 - the public `offlineroutingdemo://route?...` deep link remains available for
   normal manual use.
 
-Physical iPhone installation is not part of the secret-free public scope. That
-would require Apple signing credentials provided outside this repository.
+Physical iPhone installation uses EAS remote credentials only. Nothing Apple is
+committed here: the repo expects `EXPO_TOKEN`, and for CI-based ad hoc/TestFlight
+distribution it can also consume `EXPO_ASC_API_KEY_PATH` or a temporary file
+derived from `EXPO_ASC_API_KEY_BASE64`, plus `EXPO_ASC_KEY_ID` and
+`EXPO_ASC_ISSUER_ID`. If the Expo project already stores its App Store Connect
+key remotely, `EXPO_TOKEN` alone is sufficient for the public workflow and
+`ios-distribution.yml` skips local key material injection.
+
+For this demo, there are two physical-device rails:
+
+- `ios-internal`: ad hoc internal distribution for enrolled devices only;
+- `ios-testflight`: store-signed build for App Store Connect upload and TestFlight
+  processing.
+
+The manual GitHub workflow is
+[`ios-distribution.yml`](.github/workflows/ios-distribution.yml). It runs on
+Linux because EAS Build and EAS Submit handle iOS cloud signing and App Store
+Connect upload remotely.
+
+Local commands are the same:
+
+```bash
+pnpm install --frozen-lockfile
+
+cd apps/mobile
+../../node_modules/.bin/eas whoami
+../../node_modules/.bin/eas build --platform ios --profile ios-internal --non-interactive
+../../node_modules/.bin/eas build --platform ios --profile ios-testflight --non-interactive
+../../node_modules/.bin/eas submit --platform ios --profile production --latest --non-interactive
+```
+
+Package scripts mirror those commands:
+
+- `pnpm --dir apps/mobile run build:ios-internal`
+- `pnpm --dir apps/mobile run build:ios-internal:refresh`
+- `pnpm --dir apps/mobile run build:ios-testflight`
+- `pnpm --dir apps/mobile run submit:ios-testflight`
+
+The signed packaging evidence is
+[`docs/evidence/2026-09-01T10-37-26Z-ios-eas-elevation-cut-build.md`](docs/evidence/2026-09-01T10-37-26Z-ios-eas-elevation-cut-build.md):
+EAS completed a real `arm64` ad hoc build for `dev.offlinerouting.demo` from the
+shared-selector commit, using its own App ID/profile and one enrolled test device.
+The earlier signed packaging baseline remains recorded in
+[`docs/evidence/2026-09-01T08-44-36Z-ios-eas-signed-build.md`](docs/evidence/2026-09-01T08-44-36Z-ios-eas-signed-build.md),
+and the credential-bootstrap attempt remains recorded in
+[`docs/evidence/2026-09-01T07-51-19Z-ios-eas-attempt.md`](docs/evidence/2026-09-01T07-51-19Z-ios-eas-attempt.md).
+
+The ad hoc IPA stays in EAS instead of becoming a public GitHub release asset:
+an embedded ad hoc profile enumerates provisioned device identifiers. GitHub
+stores the non-identifying build facts and checksum; the physical-device smoke
+remains a separate evidence gate. When devices change, rerun
+`pnpm --dir apps/mobile run build:ios-internal:refresh`, which expands to
+`eas build --platform ios --profile ios-internal --non-interactive --refresh-ad-hoc-provisioning-profile`,
+to refresh the Expo-managed ad hoc profile non-interactively.
 
 ### Android release and device gate
 
@@ -199,17 +269,16 @@ ANDROID_SERIAL=localhost:5556 \
 ```
 
 The build generates a demo keystore under `$HOME` only. No signing material is
-committed. The published `v0.3.0` asset has SHA-256
-`d4a4e6b1f10f74c0a63f614e1c5d57400e9b7037c9ab6b4bfdb443d2e36d6b1a`.
-Its cartography-3D release gate was run in airplane mode and is recorded in
-[`docs/evidence/2026-09-01T03-59-40Z-release-device.txt`](docs/evidence/2026-09-01T03-59-40Z-release-device.txt).
-The route-visibility build for `v0.4.0` was also verified in airplane mode on
-`redroid14_x86_64` / Android 14 with `route=local_native`; its APK SHA-256 is
-`bed72cc37e2dfc84f2d6920e66f33731be234f616ed93c6c49c60072e0186bcc` and
-the gate is recorded in
-[`docs/evidence/2026-09-01T06-23-00Z-release-device.txt`](docs/evidence/2026-09-01T06-23-00Z-release-device.txt).
-The earlier three-control-point loop and undo/redo replay remains documented in
-[`docs/evidence/2026-09-01T01-51-18Z-release-multipoint-airplane.txt`](docs/evidence/2026-09-01T01-51-18Z-release-multipoint-airplane.txt).
+committed. The current `v0.5.0` APK has SHA-256
+`8eab7a13155e7c8fb28a39188ff48b23e78c509047c171c16f8901b34a14b9ee`.
+Its clean release gate and direct elevation-handle drag were verified in airplane
+mode on `redroid14_x86_64` / Android 14 with `route=local_native`, and are recorded
+in [`docs/evidence/2026-09-01T10-20-46Z-elevation-cut-android.md`](docs/evidence/2026-09-01T10-20-46Z-elevation-cut-android.md).
+Historical release and multipoint replay evidence remains available under
+[`docs/evidence`](docs/evidence).
+The retained baselines are `v0.3.0`
+(`d4a4e6b1f10f74c0a63f614e1c5d57400e9b7037c9ab6b4bfdb443d2e36d6b1a`)
+and the [`v0.4.0` visibility gate](docs/evidence/2026-09-01T06-23-00Z-release-device.txt).
 The adjacent checksum asset uses the APK basename, so `sha256sum -c` works
 after downloading both files into any directory.
 
@@ -273,8 +342,9 @@ pnpm verify:live-api --url https://<worker-origin>
 - The API stores generic geometry and metrics, not identities or product logic.
 - The benchmark evidence is honest about the named emulator until an arm64 phone
   run is added.
-- The public iOS proof is an unsigned simulator build plus runtime evidence, not
-  an App Store or TestFlight delivery.
+- Signed physical iOS packaging is complete. The remaining device gate is an
+  install plus airplane-mode route smoke on the enrolled iPad. TestFlight still
+  requires an App Store Connect app and submission credentials.
 
 ## Data and licensing
 

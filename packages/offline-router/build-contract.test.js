@@ -54,6 +54,7 @@ test("ios packaging builds public Rust libraries into a required XCFramework", (
   const podspec = read("OfflineRouter.podspec");
   const script = read("scripts/build-ios-rust-xcframework.sh");
   const workflow = read("../../.github/workflows/ios.yml");
+  const distributionWorkflow = read("../../.github/workflows/ios-distribution.yml");
   const readme = read("../../README.md");
   const simulatorScript = read("scripts/verify-ios-simulator.sh");
   const podfile = read("../../apps/mobile/ios/Podfile");
@@ -106,6 +107,14 @@ test("ios packaging builds public Rust libraries into a required XCFramework", (
   assert.match(workflow, /iphonesimulator/);
   assert.match(workflow, /upload-artifact/);
   assert.match(workflow, /verify-ios-simulator\.sh/);
+  assert.match(distributionWorkflow, /name: ios-distribution/);
+  assert.match(distributionWorkflow, /runs-on: ubuntu-latest/);
+  assert.match(distributionWorkflow, /Prepare optional App Store Connect API key/);
+  assert.match(distributionWorkflow, /EXPO_ASC_API_KEY_BASE64/);
+  assert.match(distributionWorkflow, /submit_to_testflight/);
+  assert.match(readme, /ios-distribution\.yml/);
+  assert.match(readme, /build:ios-testflight/);
+  assert.match(readme, /submit:ios-testflight/);
   assert.match(simulatorScript, /xcrun simctl bootstatus/);
   assert.match(simulatorScript, /xcrun simctl install/);
   assert.match(simulatorScript, /--offline-routing-verification-route/);

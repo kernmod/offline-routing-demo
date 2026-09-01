@@ -5,7 +5,9 @@ focused failing test, then moved through the smallest green implementation,
 refactor, coverage gate, and independent audit/review pass.
 The test pyramid combines unit, property, integration, E2E, and device checks.
 The iOS surface keeps the same rule: contracts first on Linux, runtime proof on
-macOS where Xcode and the simulator actually exist.
+macOS where Xcode and the simulator actually exist. Physical-device distribution
+is a second contract: public config and workflow assertions on Linux, then a
+real EAS build or submit attempt with remote credentials only.
 
 ## Coverage contract
 
@@ -66,8 +68,12 @@ The Route Studio build order is enforced by tests:
 | P4 WASM build | `pnpm build:wasm` + committed-output diff gate | pinned Rust 1.94.1, wasm-bindgen 0.2.127, isolated cold target, stable path remapping, and Ubuntu 22.04 build image regenerate byte-identical browser output in local build, CI, and Pages | green |
 | P4 viewer parity | `pnpm --filter @offline-routing/viewer test:coverage` | 46 tests, including real generated-WASM parity, strict publication-response validation, high-contrast 2D/3D cartography, and full-casing hit testing | green |
 | P5 API | `pnpm --filter @offline-routing/api test:coverage` | 29 tests, 99.29% lines, 90.63% branches, 100% funcs | green |
-| P6 mobile package | `pnpm coverage:mobile` | 51 tests, 95.55% lines, 83.93% branches, 90.76% funcs | green |
+| P6 mobile package | `pnpm coverage:mobile` | 56 tests, 96.03% lines, 83.56% branches, 91.42% funcs; includes the Android/iOS shared SVG elevation-cut selector contract | green |
+| P6a Android elevation-cut device smoke | [`docs/evidence/2026-09-01T10-20-46Z-elevation-cut-android.md`](evidence/2026-09-01T10-20-46Z-elevation-cut-android.md) | clean release APK on `redroid14_x86_64` / Android 14 in airplane mode; direct handle drag changed start from 0 m to 92 m with a 44 dp target | green |
 | P6b iOS package contract | `node --test packages/offline-router/build-contract.test.js tools/audit/ios-workflow.test.mjs` | 5/5 pass for podspec, Rust aggregator, XCFramework script, simulator verifier, and macOS workflow contract | green |
+| P6c iOS physical distribution contract | `node --test packages/offline-router/build-contract.test.js tools/audit/ios-workflow.test.mjs` | same gate also requires `ios-distribution.yml`, `ios-testflight`, and the public EAS/TestFlight doc rail | green after repo alignment |
+| P6d signed ad hoc build — elevation-cut selector | [`docs/evidence/2026-09-01T10-37-26Z-ios-eas-elevation-cut-build.md`](evidence/2026-09-01T10-37-26Z-ios-eas-elevation-cut-build.md) | EAS `INTERNAL` arm64 archive from the shared-selector revision finished; bundle, assets, signing profile count, integrity and checksum inspected | green |
+| P6e iOS physical runtime | enrolled iPad install + airplane-mode route evidence | must prove `local_native` routing and zero routing-network fallback on the signed archive | pending device smoke |
 | P7 browser E2E | `pnpm --filter @offline-routing/viewer test:e2e` | 8/8 pass desktop + mobile viewport, including the 2D/3D cartography flow | green |
 | P8 root coverage | `pnpm test:coverage` | LCOV_OK for root, mobile, offline-router, api, viewer, and shared | green |
 | P8 Rust coverage | `cargo llvm-cov --workspace --all-targets --exclude cch-routing-lite-wasm --fail-under-lines 80` | `coverage/rust.lcov` regenerated; the browser-only WASM crate stays covered by `pnpm build:wasm` and viewer parity/E2E gates | green |
@@ -92,6 +98,11 @@ make fixture
 make verify-fixture
 pnpm audit:public
 node --test packages/offline-router/build-contract.test.js tools/audit/ios-workflow.test.mjs
+gh workflow run ios-distribution.yml -f profile=ios-internal -f submit_to_testflight=false
+gh workflow run ios-distribution.yml -f profile=ios-testflight -f submit_to_testflight=true
+pnpm --dir apps/mobile run build:ios-internal:refresh
+pnpm --dir apps/mobile run build:ios-testflight
+pnpm --dir apps/mobile run submit:ios-testflight
 pnpm verify:live-api --url https://your-worker.workers.dev
 ```
 
@@ -109,7 +120,10 @@ pnpm verify:live-api --url https://your-worker.workers.dev
 - browser tests for WASM routing, editing, trimming, confirmation, publish, and
   mobile viewport accessibility, 2D/3D toggle, and extrusion presence;
 - mobile controller tests for offline editing, retry, persistence, and network
-  quarantine, plus the native 2D/3D switch accessible control;
+  quarantine, plus the native 2D/3D switch and the shared Android/iOS SVG
+  elevation-cut selector contract;
 - iOS packaging contract tests for the single-archive Rust link unit, the
-  fail-loud CocoaPods boundary, and the simulator smoke script/workflow;
+  fail-loud CocoaPods boundary, the simulator smoke script/workflow, and the
+  manual EAS/TestFlight distribution workflow, including the "remote Expo key
+  or temporary CI key" branch for App Store Connect;
 - device scripts for airplane-mode boot, local route, and benchmark logging.

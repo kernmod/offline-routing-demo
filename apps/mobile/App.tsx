@@ -2,7 +2,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Linking, type NativeSyntheticEvent, Pressable, StyleSheet, Text, View } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { Camera, GeoJSONSource, Layer, Map as MapView, type PressEvent } from "@maplibre/maplibre-react-native";
-import type { RouteStudioDraft } from "@offline-routing/route-studio";
+import {
+  getGeometryForRange,
+  getMetricsForRange,
+  type DraftSelection,
+  type RouteStudioDraft
+} from "@offline-routing/route-studio";
 
 import { createDemoController } from "./app.js";
 import { parseBenchmarkUrl } from "./src/benchmarkLink";
@@ -14,8 +19,7 @@ import {
   PublicationPanel,
   PublishConfirmation,
   StudioSheet,
-  TrimStepper,
-  type ProfileMode
+  TrimStepper
 } from "./src/components/StudioControls";
 import { mobileDraftStore } from "./src/mobileDraftStore";
 import { listSegments, networkDisabled, publishSegment } from "./src/networkApi";
@@ -73,15 +77,20 @@ type AppProps = { verificationRouteUrl?: string };
 export default function App({ verificationRouteUrl }: AppProps) {
   const controllerRef = useRef<Controller | null>(null);
   const nativeRouterRef = useRef<Awaited<ReturnType<typeof prepareOfflineFixture>>["router"] | null>(null);
+  const trimTokenRef = useRef(0);
   const [studio, setStudio] = useState<StudioState | null>(null);
   const [styleUrl, setStyleUrl] = useState<string | null>(null);
   const [feedback, setFeedback] = useState("Preparing the embedded map and route pack.");
   const [busy, setBusy] = useState(true);
-  const [profileMode, setProfileMode] = useState<ProfileMode>("inspect");
   const [mapMode, setMapMode] = useState<"3d" | "2d">("3d");
+  const [trimPreview, setTrimPreview] = useState<DraftSelection | null>(null);
 
   const routeFeature = useMemo(() => lineFeature(studio?.route?.polyline ?? []), [studio?.route?.polyline]);
-  const selectedFeature = useMemo(() => lineFeature(studio?.selectedGeometry ?? []), [studio?.selectedGeometry]);
+  const selectedGeometry = useMemo(() => {
+    if (!studio || !trimPreview) return studio?.selectedGeometry ?? [];
+    return getGeometryForRange(studio.draft, trimPreview.startM, trimPreview.endM);
+  }, [studio, trimPreview]);
+  const selectedFeature = useMemo(() => lineFeature(selectedGeometry), [selectedGeometry]);
   const controlFeature = useMemo(() => pointFeature((studio?.draft.controlPoints ?? []) as ElevationPoint[], "control"), [studio?.draft.controlPoints]);
   const cursorFeature = useMemo(() => pointFeature(studio?.profileCursor ? [studio.profileCursor] : [], "cursor"), [studio?.profileCursor]);
   const mapCamera = useMemo(() => ({
@@ -188,25 +197,36 @@ export default function App({ verificationRouteUrl }: AppProps) {
     void run(() => controllerRef.current!.tapPoint({ lat, lng }));
   };
 
-  const applyTrim = (handle: "start" | "end", distanceM: number) => {
-    if (!studio || !controllerRef.current || studio.metrics.distanceM <= 0) return;
-    const current = studio.draft.selection ?? { startM: 0, endM: studio.metrics.distanceM };
-    const next =
-      handle === "start"
-        ? { startM: Math.min(distanceM, current.endM - 1), endM: current.endM }
-        : { startM: current.startM, endM: Math.max(distanceM, current.startM + 1) };
-    void run(() => controllerRef.current!.setTrim(Math.max(0, next.startM), Math.min(studio.metrics.distanceM, next.endM)));
-  };
-
   const scrubProfile = (distanceM: number) => {
     if (!controllerRef.current) return;
     const inspected = controllerRef.current.scrubProfile(distanceM);
     setStudio(inspected);
-    if (profileMode !== "inspect") applyTrim(profileMode, distanceM);
+  };
+
+  const applyTrimRange = (startM: number, endM: number) => {
+    if (!studio || !controllerRef.current || studio.metrics.distanceM <= 0) return;
+    setTrimPreview({ startM, endM });
+    const token = ++trimTokenRef.current;
+    controllerRef.current.setTrim(startM, endM).then((next) => {
+      if (token !== trimTokenRef.current) return;
+      setStudio(next);
+      setTrimPreview(null);
+      setFeedback(next.message);
+    }).catch((error: unknown) => {
+      if (token !== trimTokenRef.current) return;
+      setTrimPreview(null);
+      setFeedback(error instanceof Error ? error.message.replaceAll("_", " ") : "The selection could not be updated.");
+    });
+  };
+
+  const previewTrimRange = (startM: number, endM: number, cursorDistanceM: number) => {
+    setTrimPreview({ startM, endM });
+    scrubProfile(cursorDistanceM);
   };
 
   const stepTrim = (handle: "start" | "end", direction: number) => {
     if (!studio || !controllerRef.current) return;
+    setTrimPreview(null);
     const next = stepTrimRange(studio.metrics.distanceM, studio.draft.selection, handle, direction);
     void run(() => controllerRef.current!.setTrim(next.startM, next.endM));
   };
@@ -220,7 +240,10 @@ export default function App({ verificationRouteUrl }: AppProps) {
   };
 
   const metrics = studio?.metrics ?? emptyMetrics;
-  const selectionMetrics = studio?.selectionMetrics ?? emptyMetrics;
+  const selectionMetrics = useMemo(() => {
+    if (!studio || !trimPreview) return studio?.selectionMetrics ?? emptyMetrics;
+    return getMetricsForRange(studio.draft, trimPreview.startM, trimPreview.endM);
+  }, [studio, trimPreview]);
   const confirmed = studio?.draft.status === "ready" && studio.publishStatus === "confirming";
   const locked = busy || studio?.draft.status === "publishing";
 
@@ -375,13 +398,18 @@ export default function App({ verificationRouteUrl }: AppProps) {
           />
           <ElevationProfile
             profile={studio.profile}
-            selection={studio.draft.selection}
+            totalDistanceM={metrics.distanceM}
+            selection={trimPreview ?? studio.draft.selection}
             cursorDistanceM={studio.profileCursor?.distanceM ?? null}
-            mode={profileMode}
-            onMode={setProfileMode}
+            disabled={locked || metrics.distanceM <= 1}
+            onTrimPreview={previewTrimRange}
+            onTrimCommit={applyTrimRange}
             onScrub={scrubProfile}
           />
-          <TrimStepper disabled={locked || metrics.distanceM <= 1} onStep={stepTrim} onReset={() => void run(() => controllerRef.current!.resetTrim())} />
+          <TrimStepper disabled={locked || metrics.distanceM <= 1} onStep={stepTrim} onReset={() => {
+            setTrimPreview(null);
+            void run(() => controllerRef.current!.resetTrim());
+          }} />
           <PublicationPanel
             name={studio.nameInput}
             status={studio.publishStatus}

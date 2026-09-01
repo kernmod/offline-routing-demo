@@ -178,6 +178,20 @@ export function getSelectionMetrics(draft) {
   return metricsFromGeometry(getTrimmedGeometry(draft));
 }
 
+export function getGeometryForRange(draft, startM, endM) {
+  const geometry = getComposedGeometry(draft);
+  const total = metricsFromGeometry(geometry).distanceM;
+  assertFiniteNumber(startM, "startM");
+  assertFiniteNumber(endM, "endM");
+  if (startM > endM) throw new RangeError("startM must be <= endM");
+  if (startM < 0 || endM > total) throw new RangeError("preview range must stay within route distance");
+  return trimGeometry(geometry, startM, endM);
+}
+
+export function getMetricsForRange(draft, startM, endM) {
+  return metricsFromGeometry(getGeometryForRange(draft, startM, endM));
+}
+
 export function getElevationProfile(draft) {
   return profileFromGeometry(getComposedGeometry(draft));
 }

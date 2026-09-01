@@ -101,9 +101,25 @@ For iOS, the same app uses:
   and checks the log evidence for `routeSource:"local_native"` and
   `networkAttempts":0`. The launch property avoids the iOS 26 custom-scheme
   confirmation dialog; the regular public deep link remains enabled.
+- one ad hoc internal build profile for enrolled devices only;
+- one store-signed `ios-testflight` build profile plus `submit.production` for
+  App Store Connect and TestFlight delivery through EAS.
 
-Physical-device signing stays out of scope for the public repo. The CI proof is
-the unsigned simulator build and runtime evidence on macOS.
+Physical-device signing still stays outside Git. The public repo only declares
+the bundle ID, the EAS project, and the workflow contract. The actual signing
+material remains remote in Expo/EAS or temporary CI environment variables such
+as `EXPO_TOKEN`, `EXPO_ASC_API_KEY_PATH`, `EXPO_ASC_KEY_ID`, and
+`EXPO_ASC_ISSUER_ID`.
+The demo now has its own explicit App ID and ad hoc profile for
+`dev.offlinerouting.demo`; its first remote `arm64` `INTERNAL` build completed
+successfully. The account-level certificate is shared without exporting it,
+while the app-specific profile contains one enrolled test device. When that
+device set changes, EAS can rebuild the profile with
+`--refresh-ad-hoc-provisioning-profile`.
+
+The signed ad hoc archive remains in EAS rather than GitHub because its embedded
+profile enumerates provisioned device identifiers. TestFlight is a distinct
+store-signed rail and still requires App Store Connect setup/submission.
 
 ## Web path
 

@@ -86,6 +86,7 @@ tasks.register("ensureDemoDebugKeystore") {
 def releaseIntermediatesSourcemapDir = layout.buildDirectory.dir("intermediates/sourcemaps/react/release")
 def releaseGeneratedSourcemapDir = layout.buildDirectory.dir("generated/sourcemaps/react/release")
 def releaseDexMergeDir = layout.buildDirectory.dir("intermediates/dex/release/mergeDexRelease")
+def prepareCxxDirsScript = new File(rootProject.projectDir, "../../../scripts/device/prepare-cxx-dirs.mjs")
 tasks.register("prepareReleaseSourcemapDir") {
     outputs.dirs(releaseIntermediatesSourcemapDir, releaseGeneratedSourcemapDir)
     doLast {
@@ -157,6 +158,11 @@ android {
         jniLibs {
             def enableLegacyPackaging = findProperty('expo.useLegacyPackaging') ?: 'false'
             useLegacyPackaging enableLegacyPackaging.toBoolean()
+            // The public offline router package also references core RN shared
+            // libraries through its JNI copy step when the app builds on the
+            // legacy architecture. Package the app with the canonical copies
+            // from react-android and keep the Rust/Nitro binaries intact.
+            pickFirsts += ["**/libjsi.so", "**/libreactnative.so"]
         }
     }
     androidResources {
@@ -170,10 +176,24 @@ android {
 preBuild.dependsOn(tasks.named("ensureDemoDebugKeystore"))
 tasks.matching { it.name == "createBundleReleaseJsAndAssets" }.configureEach {
     dependsOn(tasks.named("prepareReleaseSourcemapDir"))
+    doFirst {
+        releaseIntermediatesSourcemapDir.get().asFile.mkdirs()
+        releaseGeneratedSourcemapDir.get().asFile.mkdirs()
+    }
 }
 tasks.matching { it.name.startsWith("configureCMakeRelWithDebInfo") || it.name.startsWith("buildCMakeRelWithDebInfo") }.configureEach {
     dependsOn(tasks.named("generateAutolinkingNewArchitectureFiles"))
     dependsOn(tasks.named("generateAutolinkingPackageList"))
+}
+tasks.matching { it.name.startsWith("buildCMakeRelWithDebInfo") }.configureEach {
+    doFirst {
+        def cxxRoot = file("$projectDir/.cxx/RelWithDebInfo")
+        if (cxxRoot.exists()) {
+            project.exec {
+                commandLine "node", prepareCxxDirsScript.absolutePath, cxxRoot.absolutePath
+            }
+        }
+    }
 }
 tasks.matching { it.name == "stripReleaseDebugSymbols" }.configureEach {
     dependsOn("mergeReleaseNativeLibs")

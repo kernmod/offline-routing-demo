@@ -13,6 +13,7 @@
     "react": "19.1.0",
     "react-native": "0.81.5",
     "react-native-nitro-modules": "0.32.1",
+    "react-native-svg": "15.12.1",
     "react-native-offline-router": "workspace:*"
   },
   "publishConfig": {
@@ -25,6 +26,12 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
+    "eas-build-pre-install": "bash ../../scripts/ios/eas-build-pre-install.sh",
+    "build:ios-internal": "eas build --platform ios --profile ios-internal --non-interactive",
+    "build:ios-internal:refresh": "eas build --platform ios --profile ios-internal --non-interactive --refresh-ad-hoc-provisioning-profile",
+    "build:ios-testflight": "eas build --platform ios --profile ios-testflight --non-interactive",
+    "build:ios-simulator-eas": "eas build --platform ios --profile ios-simulator --non-interactive",
+    "submit:ios-testflight": "eas submit --platform ios --profile production --latest --non-interactive",
     "build": "tsc --noEmit && node -e \"const fs=require('fs');['App.tsx','app.json','src/offlineBoot.ts'].forEach((file)=>fs.accessSync(file)); console.log('mobile source ready')\"",
     "lint": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
