@@ -38,6 +38,7 @@ test("WASM generation pins Rust, target, and wasm-bindgen for reproducible publi
 test("CI and Pages install the exact WASM generator before building the viewer", () => {
   for (const path of [".github/workflows/ci.yml", ".github/workflows/pages.yml"]) {
     const workflow = read(path);
+    assert.match(workflow, /runs-on:\s*ubuntu-22\.04/);
     assert.match(workflow, /toolchain:\s*1\.94\.1/);
     assert.match(workflow, /targets:\s*wasm32-unknown-unknown/);
     assert.match(workflow, /cargo install wasm-bindgen-cli --locked --version 0\.2\.127/);
