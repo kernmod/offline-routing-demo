@@ -25,6 +25,7 @@ trimming, explicit publication, and immediate read-back from a live API.
 - Android APK: <https://github.com/kernmod/offline-routing-demo/releases/latest/download/offline-routing-demo-route-studio.apk>
 - Segment API health: <https://offline-routing-segments.yaktrak.workers.dev/health>
 - iOS Simulator app: <https://github.com/kernmod/offline-routing-demo/releases/latest/download/offline-routing-demo-ios-simulator-app.zip>
+- iOS build artifacts: [Rust XCFramework](https://github.com/kernmod/offline-routing-demo/releases/latest/download/offline-routing-demo-ios-rust-xcframework.zip) · [simulator evidence](https://github.com/kernmod/offline-routing-demo/releases/latest/download/offline-routing-demo-ios-simulator-evidence.zip)
 - Reproducible iOS run: [GitHub Actions workflow `ios`](https://github.com/kernmod/offline-routing-demo/actions/workflows/ios.yml)
 - Physical iOS distribution: [GitHub Actions workflow `ios-distribution`](https://github.com/kernmod/offline-routing-demo/actions/workflows/ios-distribution.yml)
 
