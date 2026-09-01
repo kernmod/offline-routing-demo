@@ -99,12 +99,27 @@ describe("MapCanvas", () => {
     expect(onTilesError).toHaveBeenCalledWith("style missing");
     act(() => mapMocks.latest()?.trigger("load"));
     act(() => mapMocks.latest()?.trigger("idle"));
-    act(() => mapMocks.latest()?.trigger("click", { features: [{ properties: { id: "seed-sydney-cbd-001" } }] }, "published-segments-line"));
+    act(() => mapMocks.latest()?.trigger("click", { features: [{ properties: { id: "seed-sydney-cbd-001" } }] }, "published-segments-casing"));
     expect(onSelect).toHaveBeenCalledWith("seed-sydney-cbd-001");
-    act(() => mapMocks.latest()?.trigger("mouseenter", undefined, "published-segments-line"));
+    act(() => mapMocks.latest()?.trigger("mouseenter", undefined, "published-segments-casing"));
     expect(mapMocks.latest()?.canvas.style.cursor).toBe("pointer");
-    act(() => mapMocks.latest()?.trigger("mouseleave", undefined, "published-segments-line"));
+    act(() => mapMocks.latest()?.trigger("mouseleave", undefined, "published-segments-casing"));
     expect(mapMocks.latest()?.canvas.style.cursor).toBe("");
+  });
+
+  it("treats the full published casing as the hit target instead of adding a draft point", () => {
+    const onMapPoint = vi.fn();
+    render(
+      <MapCanvas segments={[segment]} selectedId={null} onSelect={vi.fn()} onTilesReady={vi.fn()} onTilesError={vi.fn()} onMapPoint={onMapPoint} />
+    );
+    act(() => mapMocks.latest()?.trigger("load"));
+    mapMocks.latest()?.queryRenderedFeatures.mockReturnValueOnce([{ properties: { id: segment.id } }]);
+    act(() => mapMocks.latest()?.trigger("click", { point: { x: 10, y: 10 }, lngLat: { lat: -33.869, lng: 151.211 } }));
+    expect(mapMocks.latest()?.queryRenderedFeatures).toHaveBeenCalledWith(
+      { x: 10, y: 10 },
+      { layers: ["published-segments-casing"] }
+    );
+    expect(onMapPoint).not.toHaveBeenCalled();
   });
 
   it("uses the latest segment list when live data wins the race against map load", () => {

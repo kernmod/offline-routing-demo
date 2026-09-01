@@ -86,12 +86,14 @@ verify_symbols() {
   local library="$1"
   local symbol
   local symbols
+  local symbol_names
   # Apple's nm in Xcode 16 cannot decode LLVM 21 object attributes emitted by
   # Rust 1.94. Use the matching Rust toolchain's llvm-nm for deterministic
   # symbol inspection across all three Apple archives.
   symbols="$("${LLVM_NM}" --defined-only --extern-only "${library}")"
+  symbol_names="$(awk '{print $NF}' <<<"${symbols}" | sed 's/^_//')"
   for symbol in "${REQUIRED_SYMBOLS[@]}"; do
-    if ! grep -q "${symbol}" <<<"${symbols}"; then
+    if ! grep -Fxq "${symbol}" <<<"${symbol_names}"; then
       printf 'error: %s does not define required symbol %s\n' "${library}" "${symbol}" >&2
       exit 1
     fi

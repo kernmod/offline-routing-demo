@@ -20,7 +20,11 @@ test("public iOS workflow proves simulator builds without Apple signing secrets"
   assert.match(workflow, /-scheme mobile/);
   assert.match(workflow, /-sdk iphonesimulator/);
   assert.match(workflow, /CODE_SIGNING_ALLOWED=NO/);
+  assert.match(workflow, /IOS_SIMULATOR_DEVICE_NAME: "iPhone 16 Pro"/);
+  assert.match(workflow, /name=iPhone 16 Pro,OS=latest/);
   assert.match(workflow, /verify-ios-simulator\.sh/);
+  assert.match(verifier, /IOS_SIMULATOR_DEVICE_NAME/);
+  assert.match(verifier, /device\.name === requestedName/);
   assert.match(verifier, /xcrun simctl bootstatus/);
   assert.match(verifier, /xcrun simctl install/);
   assert.match(verifier, /xcrun simctl openurl/);

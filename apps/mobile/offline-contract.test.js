@@ -160,6 +160,7 @@ test("the native package exposes the same routing-only Nitro surface on iOS", ()
   const podspec = read("../../packages/offline-router/OfflineRouter.podspec");
   const buildContract = read("../../packages/offline-router/build-contract.test.js");
   const infoPlist = read("ios/mobile/Info.plist");
+  const appDelegate = read("ios/mobile/AppDelegate.swift");
   const podfile = read("ios/Podfile");
   const appConfig = JSON.parse(read("app.json"));
   assert.match(podspec, /ios\/OfflineRouterCore\.xcframework/);
@@ -170,6 +171,8 @@ test("the native package exposes the same routing-only Nitro surface on iOS", ()
   assert.match(infoPlist, /CFBundleURLTypes/);
   assert.match(infoPlist, /offlineroutingdemo/);
   assert.match(infoPlist, /NSAllowsLocalNetworking/);
+  assert.match(appDelegate, /^import Expo$/m);
+  assert.doesNotMatch(appDelegate, /^internal import Expo$/m);
   assert.match(podfile, /\$MLRN\.post_install\(installer\)/);
   assert.ok(appConfig.expo.plugins.includes("@maplibre/maplibre-react-native"));
 });

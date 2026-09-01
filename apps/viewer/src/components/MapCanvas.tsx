@@ -122,8 +122,8 @@ export function MapCanvas({
     });
 
     map.on("click", (event: { point?: maplibregl.PointLike; lngLat?: { lat: number; lng: number } }) => {
-      if (event.point && map.getLayer("published-segments-line")) {
-        const publishedHits = map.queryRenderedFeatures(event.point, { layers: ["published-segments-line"] });
+      if (event.point && map.getLayer("published-segments-casing")) {
+        const publishedHits = map.queryRenderedFeatures(event.point, { layers: ["published-segments-casing"] });
         if (publishedHits.length > 0) return;
       }
       const point = event.lngLat ? { lat: event.lngLat.lat, lng: event.lngLat.lng, elevationM: 0 } : null;
@@ -132,14 +132,14 @@ export function MapCanvas({
       callbacksRef.current.onMapPoint?.(point);
     });
 
-    map.on("click", "published-segments-line", (event: { features?: Array<{ properties?: { id?: string } }> }) => {
+    map.on("click", "published-segments-casing", (event: { features?: Array<{ properties?: { id?: string } }> }) => {
       const id = event.features?.[0]?.properties?.id;
       if (typeof id === "string") callbacksRef.current.onSelect(id);
     });
-    map.on("mouseenter", "published-segments-line", () => {
+    map.on("mouseenter", "published-segments-casing", () => {
       map.getCanvas().style.cursor = "pointer";
     });
-    map.on("mouseleave", "published-segments-line", () => {
+    map.on("mouseleave", "published-segments-casing", () => {
       map.getCanvas().style.cursor = "";
     });
 

@@ -89,6 +89,9 @@ deep-link without network dependency.
 For iOS, the same app uses:
 
 - one CocoaPods package for `packages/offline-router`;
+- local-path CocoaPods integration only: the repository builds its ignored
+  XCFramework from source before `pod install`; it is not distributed through
+  the CocoaPods registry;
 - one required vendored framework, `OfflineRouterCore.xcframework`;
 - one Rust `staticlib` aggregator, `crates/offline-routing-mobile-core`, so the
   app links a single Rust archive rather than two independent Rust static

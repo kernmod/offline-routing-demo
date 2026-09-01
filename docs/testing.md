@@ -64,7 +64,7 @@ The Route Studio build order is enforced by tests:
 | P2 fixture coverage | `node --test tools/fixtures/*.test.mjs` via root gate | hostile fixture coverage retained in root gate | green |
 | P3 Rust native/FFI | `cargo test --workspace` | Rust core, FFI, WASM, tile server all pass | green |
 | P4 WASM build | `pnpm build:wasm` + committed-output diff gate | pinned Rust 1.94.1, wasm-bindgen 0.2.127, isolated cold target, stable path remapping, and Ubuntu 22.04 build image regenerate byte-identical browser output in local build, CI, and Pages | green |
-| P4 viewer parity | `pnpm --filter @offline-routing/viewer test:coverage` | 45 tests, including real generated-WASM parity, strict publication-response validation, and the high-contrast 2D/3D cartography contract | green |
+| P4 viewer parity | `pnpm --filter @offline-routing/viewer test:coverage` | 46 tests, including real generated-WASM parity, strict publication-response validation, high-contrast 2D/3D cartography, and full-casing hit testing | green |
 | P5 API | `pnpm --filter @offline-routing/api test:coverage` | 29 tests, 99.29% lines, 90.63% branches, 100% funcs | green |
 | P6 mobile package | `pnpm coverage:mobile` | 51 tests, 95.55% lines, 83.93% branches, 90.76% funcs | green |
 | P6b iOS package contract | `node --test packages/offline-router/build-contract.test.js tools/audit/ios-workflow.test.mjs` | 5/5 pass for podspec, Rust aggregator, XCFramework script, simulator verifier, and macOS workflow contract | green |

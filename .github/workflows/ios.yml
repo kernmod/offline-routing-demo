@@ -18,6 +18,8 @@ jobs:
     name: Rust / Nitro / iOS Simulator
     runs-on: macos-15
     timeout-minutes: 60
+    env:
+      IOS_SIMULATOR_DEVICE_NAME: "iPhone 16 Pro"
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1.7.0
@@ -63,7 +65,7 @@ jobs:
             -scheme mobile \
             -configuration Release \
             -sdk iphonesimulator \
-            -destination 'generic/platform=iOS Simulator' \
+            -destination 'platform=iOS Simulator,name=iPhone 16 Pro,OS=latest' \
             -derivedDataPath "$GITHUB_WORKSPACE/build/ios-derived-data" \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \

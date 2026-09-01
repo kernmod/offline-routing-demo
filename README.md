@@ -159,7 +159,7 @@ xcodebuild \
   -scheme mobile \
   -configuration Release \
   -sdk iphonesimulator \
-  -destination 'generic/platform=iOS Simulator' \
+  -destination 'platform=iOS Simulator,name=iPhone 16 Pro,OS=latest' \
   CODE_SIGNING_ALLOWED=NO \
   CODE_SIGNING_REQUIRED=NO \
   build
@@ -167,6 +167,9 @@ xcodebuild \
 
 The iOS packaging path is intentionally public and narrow:
 
+- `OfflineRouter.podspec` is the monorepo's local-path integration, not a
+  CocoaPods registry package: clone the repository and build the XCFramework
+  before `pod install`, in the order shown above;
 - one Rust `staticlib` crate, `offline-routing-mobile-core`, retains both the routing
   and loopback tile-server C ABIs in a single link unit;
 - one `OfflineRouterCore.xcframework` is required by the CocoaPods spec and checked

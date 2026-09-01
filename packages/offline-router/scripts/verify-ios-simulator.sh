@@ -16,6 +16,7 @@ demo_root="$(cd "$script_dir/../../.." && pwd)"
 app_path="${IOS_SIMULATOR_APP:-}"
 evidence_dir="${IOS_SIMULATOR_EVIDENCE_DIR:-$demo_root/artifacts/ios-simulator-evidence}"
 timeout_seconds="${IOS_SIMULATOR_TIMEOUT_SECONDS:-180}"
+requested_name="${IOS_SIMULATOR_DEVICE_NAME:-}"
 route_url="offlineroutingdemo://route?origin=-33.8688%2C151.2093&destination=-33.8695%2C151.2102"
 
 while [[ $# -gt 0 ]]; do
@@ -68,14 +69,17 @@ launch_log="$evidence_dir/launch.log"
 selection_file="$evidence_dir/simulator-selection.txt"
 xcrun simctl list devices available -j > "$device_list"
 
-selection="$(SIMULATOR_DEVICE_LIST="$device_list" node --input-type=module <<'NODE'
+selection="$(SIMULATOR_DEVICE_LIST="$device_list" SIMULATOR_DEVICE_NAME="$requested_name" node --input-type=module <<'NODE'
 import { readFileSync } from "node:fs";
 
 const inventory = JSON.parse(readFileSync(process.env.SIMULATOR_DEVICE_LIST, "utf8"));
-const candidates = Object.entries(inventory.devices ?? {})
+const requestedName = process.env.SIMULATOR_DEVICE_NAME?.trim();
+const available = Object.entries(inventory.devices ?? {})
   .filter(([runtime]) => runtime.includes(".iOS-"))
   .flatMap(([runtime, devices]) => devices.map((device) => ({ ...device, runtime })))
-  .filter((device) => device.isAvailable !== false && device.deviceTypeIdentifier?.includes("iPhone"))
+  .filter((device) => device.isAvailable !== false && device.deviceTypeIdentifier?.includes("iPhone"));
+const candidates = available
+  .filter((device) => !requestedName || device.name === requestedName)
   .sort((left, right) => {
     const leftVersion = left.runtime.match(/iOS-(\d+)-(\d+)/)?.slice(1).map(Number) ?? [0, 0];
     const rightVersion = right.runtime.match(/iOS-(\d+)-(\d+)/)?.slice(1).map(Number) ?? [0, 0];
@@ -90,7 +94,7 @@ const selected = candidates[0];
 process.stdout.write([selected.udid, selected.name, selected.runtime, selected.state].join("\n"));
 NODE
 )" || {
-  echo "No available iPhone simulator was found in the selected Xcode installation." >&2
+  echo "No available iPhone simulator matched: ${requested_name:-<any iPhone>}." >&2
   exit 3
 }
 

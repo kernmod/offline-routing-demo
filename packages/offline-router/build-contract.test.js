@@ -54,6 +54,7 @@ test("ios packaging builds public Rust libraries into a required XCFramework", (
   const podspec = read("OfflineRouter.podspec");
   const script = read("scripts/build-ios-rust-xcframework.sh");
   const workflow = read("../../.github/workflows/ios.yml");
+  const readme = read("../../README.md");
   const simulatorScript = read("scripts/verify-ios-simulator.sh");
   const podfile = read("../../apps/mobile/ios/Podfile");
   const workspaceCargo = read("../../Cargo.toml");
@@ -68,6 +69,7 @@ test("ios packaging builds public Rust libraries into a required XCFramework", (
   assert.match(podspec, /spec\.platforms = \{ :ios => '16\.4' \}/);
   assert.match(podspec, /Check OfflineRouterCore\.xcframework/);
   assert.match(podspec, /load 'nitrogen\/generated\/ios\/OfflineRouter\+autolinking\.rb'/);
+  assert.match(readme, /local-path integration, not a\s+CocoaPods registry package/);
   assert.match(workspaceCargo, /crates\/offline-routing-mobile-core/);
   assert.match(aggregatorCargo, /name = "offline-routing-mobile-core"/);
   assert.match(aggregatorCargo, /crate-type = \["rlib", "staticlib"\]/);
@@ -86,6 +88,8 @@ test("ios packaging builds public Rust libraries into a required XCFramework", (
   assert.match(script, /bin\/llvm-nm/);
   assert.match(script, /llvm-tools-preview/);
   assert.doesNotMatch(script, /symbols="\$\(nm /);
+  assert.match(script, /grep -Fxq/);
+  assert.doesNotMatch(script, /grep -q "\$\{symbol\}"/);
   assert.match(script, /xcodebuild -create-xcframework/);
   assert.match(script, /--print-plan/);
   const printedPlan = execFileSync("bash", [resolve(packageRoot, "scripts/build-ios-rust-xcframework.sh"), "--print-plan"], { encoding: "utf8" });
