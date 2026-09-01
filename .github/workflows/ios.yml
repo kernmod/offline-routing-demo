@@ -75,8 +75,8 @@ jobs:
         env:
           IOS_SIMULATOR_TIMEOUT_SECONDS: "180"
         run: |
-          # The verifier runs xcrun simctl boot, xcrun simctl install, then:
-          # xcrun simctl openurl "$UDID" "offlineroutingdemo://route?origin=-33.8688%2C151.2093&destination=-33.8695%2C151.2102"
+          # The verifier boots and installs, then launches with the simulator-only
+          # --offline-routing-verification-route argument to avoid an iOS URL dialog.
           # Its evidence contract is routeSource":"local_native" and networkAttempts":0.
           packages/offline-router/scripts/verify-ios-simulator.sh \
             --app "$GITHUB_WORKSPACE/build/ios-derived-data/Build/Products/Release-iphonesimulator/mobile.app" \
