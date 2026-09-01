@@ -33,6 +33,8 @@ jobs:
         run: pnpm test:policy
       - name: Build workspaces
         run: pnpm build && cargo build --workspace
+      - name: Verify committed WASM is reproducible
+        run: git diff --exit-code -- apps/viewer/src/wasm/pkg
       - name: Run JS and root tests
         run: pnpm test
       - name: Run coverage gate

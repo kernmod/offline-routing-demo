@@ -9,6 +9,7 @@ test("WASM generation pins Rust, target, and wasm-bindgen for reproducible publi
   const toolchain = read("rust-toolchain.toml");
   const packageJson = JSON.parse(read("package.json"));
   const builder = read("tools/wasm/build.mjs");
+  const makefile = read("Makefile");
 
   assert.match(toolchain, /channel\s*=\s*"1\.94\.1"/);
   assert.match(toolchain, /wasm32-unknown-unknown/);
@@ -20,6 +21,7 @@ test("WASM generation pins Rust, target, and wasm-bindgen for reproducible publi
   assert.match(builder, /cch-routing-lite-wasm/);
   assert.match(builder, /apps\/viewer\/src\/wasm\/pkg/);
   assert.doesNotMatch(builder, /shell:\s*true/);
+  assert.match(makefile, /git diff --exit-code -- apps\/viewer\/src\/wasm\/pkg/);
 });
 
 test("CI and Pages install the exact WASM generator before building the viewer", () => {
@@ -28,5 +30,6 @@ test("CI and Pages install the exact WASM generator before building the viewer",
     assert.match(workflow, /toolchain:\s*1\.94\.1/);
     assert.match(workflow, /targets:\s*wasm32-unknown-unknown/);
     assert.match(workflow, /cargo install wasm-bindgen-cli --locked --version 0\.2\.127/);
+    assert.match(workflow, /git diff --exit-code -- apps\/viewer\/src\/wasm\/pkg/);
   }
 });

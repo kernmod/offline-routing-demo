@@ -14,6 +14,7 @@ verify-fixture:
 
 build:
 	$(NODE22) "pnpm build"
+	git diff --exit-code -- apps/viewer/src/wasm/pkg
 	cargo build --workspace
 
 test: test-policy

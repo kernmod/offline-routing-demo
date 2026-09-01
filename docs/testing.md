@@ -61,7 +61,7 @@ The Route Studio build order is enforced by tests:
 | P2 fixture + DEM | `make fixture && make verify-fixture` | deterministic rebuild, manifest/schema `CCHP2`, DEM provenance pinned | green |
 | P2 fixture coverage | `node --test tools/fixtures/*.test.mjs` via root gate | hostile fixture coverage retained in root gate | green |
 | P3 Rust native/FFI | `cargo test --workspace` | Rust core, FFI, WASM, tile server all pass | green |
-| P4 WASM build | `pnpm build:wasm` | pinned Rust 1.94.1 and wasm-bindgen 0.2.127 build passes | green |
+| P4 WASM build | `pnpm build:wasm` + committed-output diff gate | pinned Rust 1.94.1 and wasm-bindgen 0.2.127 regenerate byte-identical browser output in local build, CI, and Pages | green |
 | P4 viewer parity | `pnpm --filter @offline-routing/viewer test:coverage` | 42 tests, 94.66% lines, 82.75% branches, 91.30% funcs, including real generated-WASM parity on the committed pack | green |
 | P5 API | `pnpm --filter @offline-routing/api test:coverage` | 29 tests, 99.29% lines, 90.63% branches, 100% funcs | green |
 | P6 mobile package | `pnpm coverage:mobile` | 48 tests, 95.55% lines, 83.93% branches, 90.76% funcs | green |
