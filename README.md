@@ -7,10 +7,10 @@ UI, API surface, and release pipelines were rebuilt for publication so the
 system can be inspected and run without private data, terminology, or
 infrastructure.
 
-[![Four map taps build a 3.3 km multipoint route locally and extend it immediately after each point](docs/media/offline-routing-demo.gif)](https://kernmod.github.io/offline-routing-demo/)
+[![Four map taps build a 3.3 km route locally, then the elevation end handle and profile cursor refine it](docs/media/offline-routing-demo.gif)](https://kernmod.github.io/offline-routing-demo/)
 
-_Four taps, three local recalculations, 3.3 km: every new leg appears directly
-from the on-device Rust engine._
+_Four taps, three local recalculations, then a non-destructive elevation cut:
+routing and profile editing stay on device._
 
 One Rust CCH router runs in three environments:
 
