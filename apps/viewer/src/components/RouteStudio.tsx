@@ -376,12 +376,18 @@ export function RouteStudio({
           <SegmentList segments={segments} selectedId={selectedId} onSelect={onSelect} />
           {selectedPublic && (
             <section className="selection" aria-label="Selected segment">
-              <h3>{selectedPublic.name ?? selectedPublic.id}</h3>
+              <p className="selection__eyebrow">{selectedPublic.kind === "seed" ? "fixture seed" : "public snapshot"}</p>
+              <h3>{selectedPublic.name?.trim() || selectedPublic.id}</h3>
               <dl>
-                {"publicationState" in selectedPublic && selectedPublic.publicationState && (
-                  <div><dt>status</dt><dd>{selectedPublic.publicationState}</dd></div>
-                )}
+                <div><dt>state</dt><dd>{selectedPublic.publicationState ?? "published"}</dd></div>
                 <div><dt>distance</dt><dd>{selectedPublic.distanceM} m</dd></div>
+                {selectedPublic.elevationGainM !== undefined && selectedPublic.elevationGainM !== null &&
+                  selectedPublic.elevationLossM !== undefined && selectedPublic.elevationLossM !== null && (
+                    <div><dt>elevation</dt><dd>D+ {selectedPublic.elevationGainM} m · D− {selectedPublic.elevationLossM} m</dd></div>
+                  )}
+                {selectedPublic.metricsVersion !== undefined && (
+                  <div><dt>contract</dt><dd>metrics v{selectedPublic.metricsVersion}</dd></div>
+                )}
                 <div><dt>geometry</dt><dd>{selectedPublic.pointCount} points</dd></div>
                 <div><dt>origin</dt><dd>{selectedPublic.kind === "seed" ? "fixture seed" : "live API"}</dd></div>
                 <div><dt>id</dt><dd><code>{selectedPublic.id}</code></dd></div>

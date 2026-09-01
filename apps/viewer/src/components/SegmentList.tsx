@@ -28,9 +28,8 @@ export function SegmentList({ segments, selectedId, onSelect }: SegmentListProps
               onClick={() => onSelect(segment.id)}
             >
               <span className="segment-row__kind">{segmentKind(segment)}</span>
-              <strong>{label}</strong>
-              <span>{segment.distanceM} m</span>
-              <span>{segment.pointCount} points</span>
+              <span className="segment-row__metrics">{segment.distanceM} m · {segment.pointCount} points</span>
+              <strong className="segment-row__name">{label}</strong>
               <code>{segment.id}</code>
             </button>
           </li>

@@ -12,6 +12,7 @@ export type ApiSegment = Readonly<{
   elevationsM?: number[] | null;
   elevationGainM?: number | null;
   elevationLossM?: number | null;
+  metricsVersion?: 1 | 2;
   createdAt?: string;
   expiresAt?: string | null;
 }>;

@@ -173,6 +173,12 @@ test("every JavaScript workspace has mandatory test and coverage scripts", () =>
   }
 });
 
+test("viewer coverage bootstraps its isolated reports directory after cleanup", () => {
+  const viewer = JSON.parse(read("apps/viewer/package.json"));
+  assert.match(viewer.scripts["test:coverage"], /mkdir -p \.cache\/coverage(?:\/\.tmp)?/);
+  assert.match(viewer.scripts["test:coverage"], /vitest run --coverage/);
+});
+
 test("mobile build and lint execute a real static type gate", () => {
   const mobile = JSON.parse(read("apps/mobile/package.json"));
   assert.match(mobile.scripts.build, /tsc\s+--noEmit/);

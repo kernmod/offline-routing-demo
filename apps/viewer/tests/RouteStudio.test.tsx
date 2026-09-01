@@ -25,6 +25,7 @@ vi.mock("../src/components/MapCanvas", () => ({
 }));
 
 import { RouteStudio } from "../src/components/RouteStudio";
+import { decodeRenderableSegments } from "../src/lib/segments";
 
 afterEach(cleanup);
 beforeEach(() => localStorage.clear());
@@ -78,7 +79,7 @@ function renderStudioHarness(options: Partial<React.ComponentProps<typeof RouteS
         fetcher={options.fetcher ?? vi.fn()}
         onSelect={setSelectedId}
         onPublished={(segment) => {
-          setSegments((current) => [segment, ...current.filter((entry) => entry.id !== segment.id)]);
+          setSegments((current) => decodeRenderableSegments([segment, ...current.filter((entry) => entry.id !== segment.id)]));
           setSelectedId(segment.id);
           externalOnPublished(segment);
         }}
@@ -185,7 +186,10 @@ describe("RouteStudio", () => {
     expect(screen.getByLabelText("Route Studio editor")).toHaveAttribute("data-draft-status", "published");
     await waitFor(() => expect(screen.getByRole("button", { name: "Segment Harbour rise" })).toBeVisible());
     await waitFor(() => expect(screen.getByRole("region", { name: "Selected segment" })).toHaveTextContent("Harbour rise"));
-    expect(screen.getByRole("region", { name: "Selected segment" })).toHaveTextContent("published");
+    const publishedDetail = screen.getByRole("region", { name: "Selected segment" });
+    expect(publishedDetail).toHaveTextContent("published");
+    expect(publishedDetail).toHaveTextContent("D+ 10 m · D− 6 m");
+    expect(publishedDetail).toHaveTextContent("metrics v2");
     const [, init] = fetcher.mock.calls[0] as [string, RequestInit];
     expect(init.headers).toEqual(expect.objectContaining({ "idempotency-key": expect.stringMatching(/^[0-9a-f-]{36}$/) }));
     expect(JSON.parse(String(init.body))).toEqual({

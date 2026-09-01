@@ -33,13 +33,17 @@ describe("App", () => {
   it("shows local tile provenance, seed data and an accessible selection detail", async () => {
     render(<App apiBase="https://api.example" fetcher={vi.fn().mockResolvedValue(new Response(JSON.stringify({ segments: [seed] })))}/>);
 
-    expect(await screen.findByRole("button", { name: "Segment seeded reference" })).toBeVisible();
-    expect(screen.getByRole("button", { name: "Segment seeded reference" })).toBeVisible();
-    expect(screen.getAllByText("seeded reference").length).toBeGreaterThan(0);
+    const segmentButton = await screen.findByRole("button", { name: "Segment seeded reference" });
+    expect(segmentButton).toHaveTextContent("seeded reference");
+    expect(segmentButton).toHaveTextContent("130 m · 2 points");
     expect(screen.getByText("Embedded PMTiles")).toBeVisible();
-    fireEvent.click(screen.getByRole("button", { name: "Segment seeded reference" }));
-    expect(screen.getByRole("region", { name: "Selected segment" })).toHaveTextContent("130 m");
-    expect(screen.getByRole("region", { name: "Selected segment" })).toHaveTextContent("seeded reference");
+    fireEvent.click(segmentButton);
+    const detail = screen.getByRole("region", { name: "Selected segment" });
+    expect(detail).toHaveTextContent("seeded reference");
+    expect(detail).toHaveTextContent("published");
+    expect(detail).toHaveTextContent("130 m");
+    expect(detail).toHaveTextContent("D+ 2 m · D− 0 m");
+    expect(detail).toHaveTextContent("metrics v2");
   });
 
   it("keeps the map shell and an honest failure state when the API is down", async () => {

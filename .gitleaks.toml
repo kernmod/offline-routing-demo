@@ -1,0 +1,10 @@
+title = "offline-routing-demo gitleaks policy"
+
+[allowlist]
+description = "Allow the single documented UUIDv4 idempotency fixture that gitleaks misclassifies as a generic API key."
+paths = [
+  '''apps/viewer/tests/api\.test\.ts'''
+]
+regexes = [
+  '''779a8cf1-e8e5-4590-8aa8-f46d30c3194d'''
+]

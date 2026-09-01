@@ -10,7 +10,7 @@
     "preview": "vite preview",
     "lint": "eslint src tests --max-warnings 0",
     "test": "vitest run",
-    "test:coverage": "vitest run --coverage",
+    "test:coverage": "mkdir -p .cache/coverage/.tmp && vitest run --coverage",
     "test:e2e": "playwright test",
     "test:e2e:base": "VITE_VIEWER_BASE=/viewer/ playwright test --project=desktop-chromium"
   },
