@@ -114,8 +114,8 @@ pnpm audit:public
 `make fixture` is offline after checkout. The current public routing pack is
 `CCHP2` and the committed fixture manifest records provenance, sizes, checksums,
 DEM source licensing, and the routing-pack SHA-256. `make build`, CI, and Pages
-also regenerate the pinned Rust/WASM output and fail if it differs from the
-committed browser module.
+also regenerate the pinned Rust/WASM output with path remapping and fail if it
+differs from the committed browser module.
 
 ### Local app and viewer
 
