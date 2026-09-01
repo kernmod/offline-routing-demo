@@ -173,6 +173,8 @@ test("the native package exposes the same routing-only Nitro surface on iOS", ()
   assert.match(infoPlist, /NSAllowsLocalNetworking/);
   assert.match(appDelegate, /^import Expo$/m);
   assert.doesNotMatch(appDelegate, /^internal import Expo$/m);
+  assert.match(appDelegate, /bindReactNativeFactory\(factory\)/);
+  assert.ok(appDelegate.indexOf("bindReactNativeFactory(factory)") < appDelegate.indexOf("factory.startReactNative("));
   assert.match(podfile, /\$MLRN\.post_install\(installer\)/);
   assert.ok(appConfig.expo.plugins.includes("@maplibre/maplibre-react-native"));
 });
