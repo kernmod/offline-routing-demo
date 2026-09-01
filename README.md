@@ -200,6 +200,11 @@ committed. The published `v0.3.0` asset has SHA-256
 `d4a4e6b1f10f74c0a63f614e1c5d57400e9b7037c9ab6b4bfdb443d2e36d6b1a`.
 Its cartography-3D release gate was run in airplane mode and is recorded in
 [`docs/evidence/2026-09-01T03-59-40Z-release-device.txt`](docs/evidence/2026-09-01T03-59-40Z-release-device.txt).
+The route-visibility build for `v0.4.0` was also verified in airplane mode on
+`redroid14_x86_64` / Android 14 with `route=local_native`; its APK SHA-256 is
+`bed72cc37e2dfc84f2d6920e66f33731be234f616ed93c6c49c60072e0186bcc` and
+the gate is recorded in
+[`docs/evidence/2026-09-01T06-23-00Z-release-device.txt`](docs/evidence/2026-09-01T06-23-00Z-release-device.txt).
 The earlier three-control-point loop and undo/redo replay remains documented in
 [`docs/evidence/2026-09-01T01-51-18Z-release-multipoint-airplane.txt`](docs/evidence/2026-09-01T01-51-18Z-release-multipoint-airplane.txt).
 The adjacent checksum asset uses the APK basename, so `sha256sum -c` works

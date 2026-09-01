@@ -35,7 +35,7 @@ test("README describes the recruiter-facing problem and commands", () => {
   assert.match(readme, /^## Reproduce it/m);
   assert.match(readme, /https:\/\/kernmod\.github\.io\/offline-routing-demo\//);
   assert.match(readme, /https:\/\/offline-routing-segments\.yaktrak\.workers\.dev/);
-  assert.match(readme, /releases\/download\/v0\.3\.0\/offline-routing-demo-route-studio\.apk/);
+  assert.match(readme, /releases\/latest\/download\/offline-routing-demo-route-studio\.apk/);
   assert.match(readme, /pnpm verify:live-api --url https:\/\/<worker-origin>/);
   assert.doesNotMatch(readme, /pending (?:GitHub Release|public URL|Worker URL)/i);
   assert.equal(existsSync(resolve(root, "docs/evidence/2026-08-31T20-01-00Z-live-viewer.png")), true);
@@ -66,6 +66,7 @@ test("the Android release artifact is named for Route Studio rather than a stale
   const buildScript = read("scripts/build-apk.sh");
   const readme = read("README.md");
   const releaseEvidence = read("docs/evidence/2026-09-01T03-59-40Z-release-device.txt");
+  const visibilityEvidence = read("docs/evidence/2026-09-01T06-23-00Z-release-device.txt");
   const multipointEvidence = read("docs/evidence/2026-09-01T01-51-18Z-release-multipoint-airplane.txt");
 
   assert.match(buildScript, /offline-routing-demo-route-studio\.apk/);
@@ -76,6 +77,11 @@ test("the Android release artifact is named for Route Studio rather than a stale
   assert.match(releaseEvidence, /airplane_mode=1/);
   assert.match(releaseEvidence, /route=local_native/);
   assert.match(releaseEvidence, /apk_sha256=d4a4e6b1f10f74c0a63f614e1c5d57400e9b7037c9ab6b4bfdb443d2e36d6b1a/);
+  assert.match(readme, /2026-09-01T06-23-00Z-release-device\.txt/);
+  assert.match(visibilityEvidence, /release=v0\.4\.0/);
+  assert.match(visibilityEvidence, /airplane_mode=1/);
+  assert.match(visibilityEvidence, /route=local_native/);
+  assert.match(visibilityEvidence, /apk_sha256=bed72cc37e2dfc84f2d6920e66f33731be234f616ed93c6c49c60072e0186bcc/);
   assert.match(multipointEvidence, /control_points=3/);
   assert.match(multipointEvidence, /network_attempts=0/);
   assert.match(multipointEvidence, /redo_enabled_after_undo=pass/);
