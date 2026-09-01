@@ -4,7 +4,13 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import test from "node:test";
 
-import worker, { CloudflareRateLimiter, createWorker, listNearbySegmentsQuery, type Env } from "../src/index.ts";
+import worker, {
+  CloudflareRateLimiter,
+  createWorker,
+  listNearbySegmentsQuery,
+  listNearbySegmentsV2Query,
+  type Env
+} from "../src/index.ts";
 import { decodePolyline6 } from "@offline-routing/shared";
 import { createSqliteD1 } from "./support/sqlite-d1.ts";
 
@@ -136,6 +142,16 @@ test("nearby SQL begins with the indexed cell table and has only server-derived 
   assert.match(query.sql, /FROM segment_cells sc/);
   assert.match(query.sql, /sc\.tile_key IN \(\?\)/);
   assert.equal(query.bindings.includes("14/15073/9831"), true);
+});
+
+test("v2 nearby SQL has a smaller full-record bound than the legacy endpoint", () => {
+  const query = listNearbySegmentsV2Query({
+    tileKeys: ["14/15073/9831"],
+    bbox: { minLat: -33.871, minLng: 151.208, maxLat: -33.868, maxLng: 151.212 },
+    nowIso: "2026-08-31T12:34:00.000Z"
+  });
+
+  assert.equal(query.bindings.at(-1), 10);
 });
 
 test("POST recomputes every stored derived field and persists only geometry plus metadata", async () => {
@@ -514,6 +530,42 @@ test("v2 accepts a routed fixture geometry longer than the legacy 128-point enve
       context.env
     );
     assert.equal(rejected.status, 413);
+  } finally {
+    context.cleanup();
+  }
+});
+
+test("v2 rejects oversized declared and streamed bodies before buffering the full request", async () => {
+  const context = createEnv();
+  try {
+    const app = createWorker({ now: NOW });
+    const declared = publishV2(validV2Body());
+    declared.headers.set("content-length", String(512 * 1024 + 1));
+    const declaredResponse = await app.fetch(declared, context.env);
+    assert.equal(declaredResponse.status, 413);
+
+    let pulls = 0;
+    let cancelled = false;
+    const stream = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        pulls += 1;
+        if (pulls <= 32) controller.enqueue(new Uint8Array(64 * 1024));
+        else controller.close();
+      },
+      cancel() {
+        cancelled = true;
+      }
+    });
+    const streamed = request("/v2/segments", {
+      method: "POST",
+      headers: { "content-type": "application/json", "idempotency-key": UUID_A },
+      body: stream,
+      duplex: "half"
+    } as RequestInit & { duplex: "half" });
+    const streamedResponse = await app.fetch(streamed, context.env);
+    assert.equal(streamedResponse.status, 413);
+    assert.equal(cancelled, true);
+    assert.ok(pulls <= 10, `stream reader pulled ${pulls} chunks after crossing the limit`);
   } finally {
     context.cleanup();
   }
