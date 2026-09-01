@@ -4,6 +4,7 @@ Pod::Spec.new do |spec|
   spec.name = 'OfflineRouter'
   spec.version = '0.1.0'
   spec.summary = 'Public offline PMTiles and CCH routing Nitro bridge'
+  spec.homepage = 'https://github.com/kernmod/offline-routing-demo'
   spec.license = { :type => 'MIT OR Apache-2.0' }
   spec.authors = { 'Offline Routing Demo contributors' => 'noreply@example.invalid' }
   spec.platforms = { :ios => '16.4' }

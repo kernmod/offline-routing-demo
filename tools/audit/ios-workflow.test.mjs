@@ -30,5 +30,7 @@ test("public iOS workflow proves simulator builds without Apple signing secrets"
   assert.match(verifier, /routeSource.*local_native/);
   assert.match(verifier, /networkAttempts.*0/);
   assert.match(workflow, /offline-routing-ios-simulator-app/);
+  assert.match(workflow, /Upload simulator application\n        if: success\(\)/);
+  assert.match(workflow, /Upload Rust XCFramework\n        if: success\(\)/);
   assert.doesNotMatch(`${workflow}\n${verifier}`, /APPLE_|ASC_|MATCH_|FASTLANE_|PROVISION|CERTIFICATE|P12|KEYCHAIN/);
 });

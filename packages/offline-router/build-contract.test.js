@@ -61,6 +61,7 @@ test("ios packaging builds public Rust libraries into a required XCFramework", (
   const aggregatorLib = read("../../crates/offline-routing-mobile-core/src/lib.rs");
 
   assert.match(podspec, /spec\.source_files = \[/);
+  assert.match(podspec, /spec\.homepage = 'https:\/\/github\.com\/kernmod\/offline-routing-demo'/);
   assert.match(podspec, /cpp\/\*\*\/\*\.\{hpp,cpp\}/);
   assert.match(podspec, /add_nitrogen_files\(spec\)/);
   assert.match(podspec, /spec\.vendored_frameworks = 'ios\/OfflineRouterCore\.xcframework'/);

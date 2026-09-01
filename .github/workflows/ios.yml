@@ -81,7 +81,7 @@ jobs:
             --evidence-dir "$GITHUB_WORKSPACE/artifacts/ios-simulator-evidence"
 
       - name: Upload simulator application
-        if: always()
+        if: success()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: offline-routing-ios-simulator-app
@@ -89,7 +89,7 @@ jobs:
           if-no-files-found: error
 
       - name: Upload Rust XCFramework
-        if: always()
+        if: success()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: offline-routing-ios-rust-xcframework
