@@ -122,6 +122,7 @@ test("CI executes public audit, tests, coverage, and secret scanning", () => {
   assert.match(ci, /test:policy/);
   assert.match(ci, /cargo install cargo-llvm-cov --locked --version 0\.9\.0/);
   assert.match(ci, /gitleaks/i);
+  assert.match(ci, /GITHUB_TOKEN:\s*\$\{\{ secrets\.GITHUB_TOKEN \}\}/);
   assert.match(ci, /clippy/);
 });
 
