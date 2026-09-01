@@ -64,6 +64,7 @@ test("ios packaging builds public Rust libraries into a required XCFramework", (
   assert.match(podspec, /cpp\/\*\*\/\*\.\{hpp,cpp\}/);
   assert.match(podspec, /add_nitrogen_files\(spec\)/);
   assert.match(podspec, /spec\.vendored_frameworks = 'ios\/OfflineRouterCore\.xcframework'/);
+  assert.match(podspec, /spec\.platforms = \{ :ios => '16\.4' \}/);
   assert.match(podspec, /Check OfflineRouterCore\.xcframework/);
   assert.match(podspec, /load 'nitrogen\/generated\/ios\/OfflineRouter\+autolinking\.rb'/);
   assert.match(workspaceCargo, /crates\/offline-routing-mobile-core/);
@@ -77,6 +78,7 @@ test("ios packaging builds public Rust libraries into a required XCFramework", (
   assert.match(script, /aarch64-apple-ios/);
   assert.match(script, /aarch64-apple-ios-sim/);
   assert.match(script, /x86_64-apple-ios/);
+  assert.match(script, /IPHONEOS_DEPLOYMENT_TARGET.*16\.4/);
   assert.match(script, /offline-routing-mobile-core/);
   assert.match(script, /offline_routing_mobile_core_symbol_anchor/);
   assert.match(script, /nm /);

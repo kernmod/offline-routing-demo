@@ -57,6 +57,10 @@ for command in cargo rustup lipo nm xcodebuild; do
 done
 
 export CARGO_TARGET_DIR="${RUST_TARGET_DIR}"
+# Keep Rust, C dependencies built by cc-rs, CocoaPods and the application on
+# the same minimum iOS version. Without this, the current SDK can compile zstd
+# for the host SDK while rustc links the cdylib compatibility target as iOS 10.
+export IPHONEOS_DEPLOYMENT_TARGET="${IPHONEOS_DEPLOYMENT_TARGET:-16.4}"
 
 rustup target add "${DEVICE_TARGET}" "${SIMULATOR_ARM_TARGET}" "${SIMULATOR_X86_TARGET}"
 
