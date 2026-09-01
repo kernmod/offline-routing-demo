@@ -107,4 +107,5 @@ jobs:
 
       - name: Remove temporary App Store Connect key
         if: always()
-        run: node --input-type=module -e 'import { rmSync } from "node:fs"; import { join } from "node:path"; rmSync(join(process.env.RUNNER_TEMP, "app-store-connect-key.p8"), { force: true });'
+        run: |
+          node --input-type=module -e 'import { rmSync } from "node:fs"; import { join } from "node:path"; rmSync(join(process.env.RUNNER_TEMP, "app-store-connect-key.p8"), { force: true });'

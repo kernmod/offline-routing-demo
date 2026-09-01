@@ -106,6 +106,11 @@ test("public iOS physical delivery is configured through EAS remote credentials"
   assert.match(distributionWorkflow, /github\.ref == 'refs\/heads\/main'/);
   assert.match(distributionWorkflow, /environment: ios-distribution/);
   assert.match(distributionWorkflow, /Remove temporary App Store Connect key/);
+  assert.match(
+    distributionWorkflow,
+    /- name: Remove temporary App Store Connect key\n        if: always\(\)\n        run: \|/,
+    "cleanup commands with YAML-significant colons must use a block scalar"
+  );
   const installStep = distributionWorkflow.slice(
     distributionWorkflow.indexOf("- name: Install dependencies"),
     distributionWorkflow.indexOf("- name: Prepare optional App Store Connect API key")
