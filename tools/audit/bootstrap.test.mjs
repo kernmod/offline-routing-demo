@@ -42,6 +42,26 @@ test("README describes the recruiter-facing problem and commands", () => {
   assert.equal(existsSync(resolve(root, "docs/evidence/2026-08-31T20-10-00Z-mobile-live.png")), true);
 });
 
+test("API documentation matches the published v2 record and query columns", () => {
+  const api = read("docs/api-explain.md");
+
+  for (const field of [
+    "publicationState",
+    "elevationsM",
+    "elevationGainM",
+    "elevationLossM",
+    "metricsVersion"
+  ]) {
+    assert.match(api, new RegExp(`"${field}"`), `missing documented v2 field ${field}`);
+  }
+  assert.match(api, /s\.publication_state/);
+  assert.match(api, /s\.elevation_gain_m/);
+  assert.match(api, /s\.elevation_loss_m/);
+  assert.match(api, /s\.metrics_version/);
+  assert.doesNotMatch(api, /"status"\s*:|"ascentM"\s*:|"descentM"\s*:/);
+  assert.doesNotMatch(api, /s\.status\b|s\.ascent_m\b|s\.descent_m\b/);
+});
+
 test("the Android release artifact is named for Route Studio rather than a stale pack revision", () => {
   const buildScript = read("scripts/build-apk.sh");
 

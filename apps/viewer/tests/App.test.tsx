@@ -33,10 +33,13 @@ describe("App", () => {
   it("shows local tile provenance, seed data and an accessible selection detail", async () => {
     render(<App apiBase="https://api.example" fetcher={vi.fn().mockResolvedValue(new Response(JSON.stringify({ segments: [seed] })))}/>);
 
-    expect(await screen.findByText("seeded reference")).toBeVisible();
+    expect(await screen.findByRole("button", { name: "Segment seeded reference" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Segment seeded reference" })).toBeVisible();
+    expect(screen.getAllByText("seeded reference").length).toBeGreaterThan(0);
     expect(screen.getByText("Embedded PMTiles")).toBeVisible();
-    fireEvent.click(screen.getByRole("button", { name: "Segment seed-sydney-cbd-001" }));
+    fireEvent.click(screen.getByRole("button", { name: "Segment seeded reference" }));
     expect(screen.getByRole("region", { name: "Selected segment" })).toHaveTextContent("130 m");
+    expect(screen.getByRole("region", { name: "Selected segment" })).toHaveTextContent("seeded reference");
   });
 
   it("keeps the map shell and an honest failure state when the API is down", async () => {
@@ -54,7 +57,7 @@ describe("App", () => {
 
     render(<App fetcher={fetcher} />);
 
-    expect(await screen.findByText("seeded reference")).toBeVisible();
+    expect(await screen.findByRole("button", { name: "Segment seeded reference" })).toBeVisible();
     expect(fetcher).toHaveBeenCalledWith(
       expect.stringMatching(/^http:\/\/localhost(?::\d+)?\/v2\/segments\?/),
       expect.any(Object)

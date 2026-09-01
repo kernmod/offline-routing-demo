@@ -16,22 +16,26 @@ export function SegmentList({ segments, selectedId, onSelect }: SegmentListProps
   }
   return (
     <ul className="segment-list" aria-label="Visible segments">
-      {segments.map((segment) => (
-        <li key={segment.id}>
-          <button
-            type="button"
-            className={`segment-row ${selectedId === segment.id ? "is-selected" : ""}`}
-            aria-pressed={selectedId === segment.id}
-            aria-label={`Segment ${segment.id}`}
-            onClick={() => onSelect(segment.id)}
-          >
-            <span className="segment-row__kind">{segmentKind(segment)}</span>
-            <strong>{segment.distanceM} m</strong>
-            <span>{segment.pointCount} points</span>
-            <code>{segment.id}</code>
-          </button>
-        </li>
-      ))}
+      {segments.map((segment) => {
+        const label = segment.name?.trim() || segment.id;
+        return (
+          <li key={segment.id}>
+            <button
+              type="button"
+              className={`segment-row ${selectedId === segment.id ? "is-selected" : ""}`}
+              aria-pressed={selectedId === segment.id}
+              aria-label={`Segment ${label}`}
+              onClick={() => onSelect(segment.id)}
+            >
+              <span className="segment-row__kind">{segmentKind(segment)}</span>
+              <strong>{label}</strong>
+              <span>{segment.distanceM} m</span>
+              <span>{segment.pointCount} points</span>
+              <code>{segment.id}</code>
+            </button>
+          </li>
+        );
+      })}
     </ul>
   );
 }

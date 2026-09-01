@@ -34,13 +34,15 @@ Successful publish response:
 {
   "id": "8de15dc3-80d3-4c53-89e2-50b592076cf7",
   "name": "harbour loop south",
-  "status": "published",
+  "publicationState": "published",
   "encodedGeometry": "vxdr_Awgal_Hfw@gw@",
+  "elevationsM": [34, 29],
   "controlPoints": [0, 1],
   "pointCount": 2,
   "distanceM": 130,
-  "ascentM": 5,
-  "descentM": 10,
+  "elevationGainM": 0,
+  "elevationLossM": 5,
+  "metricsVersion": 2,
   "bbox": { "minLat": -33.8696, "minLng": 151.2091, "maxLat": -33.8687, "maxLng": 151.21 },
   "createdAt": "2026-08-31T12:34:00.000Z",
   "expiresAt": "2026-09-01T12:34:00.000Z",
@@ -87,12 +89,14 @@ seed flag, and a SHA-256 idempotency digest only.
 The nearby query is intentionally two-stage:
 
 ```sql
-SELECT DISTINCT s.id, s.name, s.status, s.encoded_geometry, s.control_points_json,
-  s.point_count, s.distance_m, s.ascent_m, s.descent_m,
-  s.min_lat, s.min_lng, s.max_lat, s.max_lng, s.created_at, s.expires_at, s.is_seed
+SELECT DISTINCT s.id, s.encoded_geometry, s.point_count, s.distance_m,
+  s.min_lat, s.min_lng, s.max_lat, s.max_lng, s.created_at, s.expires_at,
+  s.is_seed, s.name, s.publication_state, s.elevations_json,
+  s.control_points_json, s.elevation_gain_m, s.elevation_loss_m, s.metrics_version
 FROM segment_cells sc
 JOIN segments s ON s.id = sc.segment_id
 WHERE sc.tile_key IN (?, ?, ...)
+  AND s.publication_state = 'published'
   AND s.max_lat >= ? AND s.min_lat <= ?
   AND s.max_lng >= ? AND s.min_lng <= ?
   AND (s.is_seed = 1 OR s.expires_at > ?)

@@ -1,5 +1,6 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { useState } from "react";
 
 const points = [
   { lat: -33.8701, lng: 151.2088 },
@@ -60,6 +61,34 @@ function renderStudio(options: Partial<React.ComponentProps<typeof RouteStudio>>
       {...options}
     />
   );
+}
+
+function renderStudioHarness(options: Partial<React.ComponentProps<typeof RouteStudio>> = {}) {
+  function Harness() {
+    const [segments, setSegments] = useState(options.segments ?? []);
+    const [selectedId, setSelectedId] = useState<string | null>(options.selectedId ?? null);
+    const externalOnPublished = options.onPublished ?? vi.fn();
+    return (
+      <RouteStudio
+        segments={segments}
+        selectedId={selectedId}
+        router={makeRouter()}
+        routerStatus="ready"
+        apiBase="https://api.example"
+        fetcher={options.fetcher ?? vi.fn()}
+        onSelect={setSelectedId}
+        onPublished={(segment) => {
+          setSegments((current) => [segment, ...current.filter((entry) => entry.id !== segment.id)]);
+          setSelectedId(segment.id);
+          externalOnPublished(segment);
+        }}
+        onTilesReady={vi.fn()}
+        onTilesError={vi.fn()}
+      />
+    );
+  }
+
+  return render(<Harness />);
 }
 
 async function addThreePoints() {
@@ -139,7 +168,7 @@ describe("RouteStudio", () => {
     let resolvePublication!: (response: Response) => void;
     const fetcher = vi.fn(() => new Promise<Response>((resolve) => { resolvePublication = resolve; }));
     const onPublished = vi.fn();
-    renderStudio({ fetcher, onPublished });
+    renderStudioHarness({ fetcher, onPublished });
     await addThreePoints();
     fireEvent.change(screen.getByRole("textbox", { name: "Segment name" }), { target: { value: "Harbour rise" } });
     fireEvent.click(screen.getByRole("button", { name: "Save private draft" }));
@@ -154,6 +183,9 @@ describe("RouteStudio", () => {
 
     await waitFor(() => expect(onPublished).toHaveBeenCalledWith(published));
     expect(screen.getByLabelText("Route Studio editor")).toHaveAttribute("data-draft-status", "published");
+    await waitFor(() => expect(screen.getByRole("button", { name: "Segment Harbour rise" })).toBeVisible());
+    await waitFor(() => expect(screen.getByRole("region", { name: "Selected segment" })).toHaveTextContent("Harbour rise"));
+    expect(screen.getByRole("region", { name: "Selected segment" })).toHaveTextContent("published");
     const [, init] = fetcher.mock.calls[0] as [string, RequestInit];
     expect(init.headers).toEqual(expect.objectContaining({ "idempotency-key": expect.stringMatching(/^[0-9a-f-]{36}$/) }));
     expect(JSON.parse(String(init.body))).toEqual({
