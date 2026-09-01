@@ -13,9 +13,13 @@ verification is closed on the deployed `main` baseline.
   longer mention private map/game chunk formats.
 - gitleaks `v8.28.0` reports no leak on the publication file set or reachable
   public Git history; the scan is repeated before each publication commit.
-- `docs/evidence/2026-09-01T01-25-11Z-release-device.txt` records the published
+- `docs/evidence/2026-09-01T01-53-00Z-release-device.txt` records the published
   `v0.2.0` APK gate on `redroid14_x86_64` in airplane mode; its digest matches
-  the GitHub Release asset.
+  the GitHub Release asset. The release checksum contains only the APK basename
+  and verifies from a fresh download directory.
+- `docs/evidence/2026-09-01T01-51-18Z-release-multipoint-airplane.txt` records
+  three control points, local loop recalculation, undo/redo, and zero network
+  attempts against that same published APK digest.
 - `docs/benchmarks/2026-09-01T01-42-17Z.json` records the current Nitro/native
   benchmark on `redroid14_x86_64 isolated (AX102)`: cold pack load 98,827 µs,
   warm p50 1,182 µs, warm p95 1,624 µs across 1,024 queries.

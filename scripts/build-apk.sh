@@ -43,7 +43,8 @@ apk_source="$demo_root/apps/mobile/android/app/build/outputs/apk/release/app-rel
 mkdir -p "$release_dir"
 apk_target="$release_dir/offline-routing-demo-route-studio.apk"
 cp "$apk_source" "$apk_target"
-sha256sum "$apk_target" > "$apk_target.sha256"
+apk_name="$(basename "$apk_target")"
+(cd "$release_dir" && sha256sum "$apk_name" > "$apk_name.sha256")
 "$demo_root/scripts/device/clean-generated.sh"
 clean_release_transients
 echo "Demo APK copied to: $apk_target"

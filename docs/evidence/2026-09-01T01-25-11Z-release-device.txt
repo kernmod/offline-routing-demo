@@ -5,4 +5,4 @@ airplane_mode=1
 startup=pass
 back=pass
 route=local_native
-apk_sha256=ad121007ab699974609103faf5ec3fd37192b9347da464cb5ec8c8eec3f9661f
+apk_sha256=aa7731a3917bba6351b47e1b0c12a16ba17bcfa41cca32f985f0b3cef10854d1

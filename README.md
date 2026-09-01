@@ -138,9 +138,13 @@ ANDROID_SERIAL=localhost:5556 \
 
 The build generates a demo keystore under `$HOME` only. No signing material is
 committed. The published `v0.2.0` asset has SHA-256
-`aa7731a3917bba6351b47e1b0c12a16ba17bcfa41cca32f985f0b3cef10854d1`;
+`ad121007ab699974609103faf5ec3fd37192b9347da464cb5ec8c8eec3f9661f`;
 its airplane-mode device gate is recorded in
-[`docs/evidence/2026-09-01T01-25-11Z-release-device.txt`](docs/evidence/2026-09-01T01-25-11Z-release-device.txt).
+[`docs/evidence/2026-09-01T01-53-00Z-release-device.txt`](docs/evidence/2026-09-01T01-53-00Z-release-device.txt),
+with the three-control-point loop and undo/redo replay in
+[`docs/evidence/2026-09-01T01-51-18Z-release-multipoint-airplane.txt`](docs/evidence/2026-09-01T01-51-18Z-release-multipoint-airplane.txt).
+The adjacent checksum asset uses the APK basename, so `sha256sum -c` works
+after downloading both files into any directory.
 
 ### Benchmarks
 

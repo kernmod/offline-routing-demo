@@ -65,14 +65,27 @@ test("API documentation matches the published v2 record and query columns", () =
 test("the Android release artifact is named for Route Studio rather than a stale pack revision", () => {
   const buildScript = read("scripts/build-apk.sh");
   const readme = read("README.md");
-  const releaseEvidence = read("docs/evidence/2026-09-01T01-25-11Z-release-device.txt");
+  const releaseEvidence = read("docs/evidence/2026-09-01T01-53-00Z-release-device.txt");
+  const multipointEvidence = read("docs/evidence/2026-09-01T01-51-18Z-release-multipoint-airplane.txt");
 
   assert.match(buildScript, /offline-routing-demo-route-studio\.apk/);
   assert.doesNotMatch(buildScript, /cchp1/i);
-  assert.match(readme, /aa7731a3917bba6351b47e1b0c12a16ba17bcfa41cca32f985f0b3cef10854d1/);
+  assert.match(readme, /ad121007ab699974609103faf5ec3fd37192b9347da464cb5ec8c8eec3f9661f/);
   assert.match(releaseEvidence, /airplane_mode=1/);
   assert.match(releaseEvidence, /route=local_native/);
-  assert.match(releaseEvidence, /apk_sha256=aa7731a3917bba6351b47e1b0c12a16ba17bcfa41cca32f985f0b3cef10854d1/);
+  assert.match(releaseEvidence, /apk_sha256=ad121007ab699974609103faf5ec3fd37192b9347da464cb5ec8c8eec3f9661f/);
+  assert.match(multipointEvidence, /control_points=3/);
+  assert.match(multipointEvidence, /network_attempts=0/);
+  assert.match(multipointEvidence, /redo_enabled_after_undo=pass/);
+  assert.match(multipointEvidence, /apk_sha256=ad121007ab699974609103faf5ec3fd37192b9347da464cb5ec8c8eec3f9661f/);
+});
+
+test("the Android release checksum is portable outside the builder filesystem", () => {
+  const buildScript = read("scripts/build-apk.sh");
+
+  assert.match(buildScript, /apk_name="\$\(basename "\$apk_target"\)"/);
+  assert.match(buildScript, /\(cd "\$release_dir" && sha256sum "\$apk_name" > "\$apk_name\.sha256"\)/);
+  assert.doesNotMatch(buildScript, /sha256sum "\$apk_target" >/);
 });
 
 test("public evidence omits builder home paths", () => {
