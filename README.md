@@ -25,7 +25,7 @@ and no business vocabulary or artifacts from the product repo.
 - Browser viewer: <https://kernmod.github.io/offline-routing-demo/>
 - Segment API health: <https://offline-routing-segments.yaktrak.workers.dev/health>
 - Android APK: <https://github.com/kernmod/offline-routing-demo/releases/download/v0.3.0/offline-routing-demo-route-studio.apk>
-- iOS simulator CI artifacts: GitHub Actions workflow `ios` on this repository
+- iOS simulator build and runtime evidence: [GitHub Actions workflow `ios`](https://github.com/kernmod/offline-routing-demo/actions/workflows/ios.yml)
 
 ## What this demonstrates
 
@@ -75,7 +75,7 @@ graph fallback.
 | `crates/cch-routing-lite-wasm` | browser WASM boundary for the same pack |
 | `crates/cch-routing-lite-ffi` | ownership-safe C ABI |
 | `crates/offline-routing-mobile-core` | single iOS `staticlib` aggregator for the public routing and loopback tile ABIs |
-| `crates/tile-server-lite` | loopback-only PMTiles/style serving for Android |
+| `crates/tile-server-lite` | loopback-only PMTiles/style serving for Android and iOS |
 | `packages/offline-router` | Nitro/C++ mobile bridge |
 | `packages/shared` | geometry, bbox, metric, and API contracts |
 | `packages/route-studio` | shared route draft, trim, profile, publish contracts |

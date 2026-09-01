@@ -130,8 +130,13 @@ test("mobile route overlays use a high-contrast layer stack over 3D buildings", 
   assert.match(source, /"line-color": "#c4663a"/);
   assert.match(source, /"line-blur": 1/);
   assert.match(source, /"line-width": 16/);
+  assert.match(source, /"line-width": 13/);
   assert.match(source, /"line-width": 12/);
+  assert.match(source, /"line-width": 10/);
   assert.match(source, /"line-width": 6/);
+  assert.match(source, /"circle-radius": 11/);
+  assert.match(source, /"circle-radius": 8/);
+  assert.match(source, /"circle-radius": 5/);
 });
 
 test("network capability is quarantined behind the explicit publish and refresh actions", () => {
