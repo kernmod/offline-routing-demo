@@ -11,6 +11,8 @@ import {
   getComposedGeometry,
   getDraftMetrics,
   getElevationProfile,
+  getGeometryForRange,
+  getMetricsForRange,
   getSelectionMetrics,
   getTrimmedGeometry,
   lookupProfileAtDistance,
@@ -300,6 +302,19 @@ test("trimDraft is non-destructive and interpolates the selected geometry", () =
   assert.equal(geometry[0].lng > 0 && geometry[0].lng < 0.001, true);
   assert.equal(geometry[0].elevationM > 10 && geometry[0].elevationM < 20, true);
   assert.equal(geometry[2].lng > 0.001 && geometry[2].lng < 0.002, true);
+});
+
+test("range previews derive geometry and metrics without mutating draft history", () => {
+  const draft = createRoutedDraft();
+  const total = getDraftMetrics(draft).distanceM;
+  const before = structuredClone(draft);
+  const geometry = getGeometryForRange(draft, total * 0.25, total * 0.75);
+  const metrics = getMetricsForRange(draft, total * 0.25, total * 0.75);
+
+  assert.ok(geometry.length >= 2);
+  assert.ok(metrics.distanceM < total);
+  assert.deepEqual(draft, before);
+  assert.equal(draft.undoStack.length, before.undoStack.length);
 });
 
 test("resetToFullSelection clears the trim and increments revision", () => {

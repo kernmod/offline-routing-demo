@@ -12,6 +12,7 @@ test("mobile is pinned to Expo 54, RN 0.81 and MapLibre RN v11", () => {
   assert.match(manifest.dependencies["react-native"], /^0\.81\./);
   assert.match(manifest.dependencies["@maplibre/maplibre-react-native"], /^\^11\./);
   assert.equal(manifest.dependencies["react-native-nitro-modules"], "0.32.1");
+  assert.equal(manifest.dependencies["react-native-svg"], "15.12.1");
 });
 
 test("the screen uses MapLibre data sources and has no rectangle-map or JS routing fallback", () => {
@@ -39,8 +40,8 @@ test("route studio exposes multipoint editing, elevation trim, draft lifecycle a
   assert.match(controls, /Close loop/);
   assert.match(controls, /Move/);
   assert.match(controls, /Delete/);
-  assert.match(controls, /Start handle/);
-  assert.match(controls, /End handle/);
+  assert.match(controls, /Selection start/);
+  assert.match(controls, /Selection end/);
   assert.match(controller, /buildPublishPayload/);
   assert.match(controller, /pendingPublishKey/);
   assert.match(controller, /publishStatus: "confirming"/);
@@ -49,6 +50,40 @@ test("route studio exposes multipoint editing, elevation trim, draft lifecycle a
   assert.match(controller, /publishStatus: "failed"/);
   assert.match(read("src/networkApi.ts"), /\/v2\/segments/);
   assert.match(read("src/networkApi.ts"), /idempotency-key/);
+});
+
+test("mobile elevation cut mirrors the web profile with direct handles on Android and iOS", () => {
+  const screen = read("App.tsx");
+  const controls = read("src/components/StudioControls.tsx");
+  const viewModel = read("src/studioViewModel.ts");
+  assert.match(controls, /from "react-native-svg"/);
+  assert.match(controls, /<Circle[^>]+fill=\{colors\.ochre\}/);
+  assert.match(controls, /<Circle[^>]+fill=\{colors\.sage\}/);
+  assert.match(controls, /PanResponder\.create/);
+  assert.match(controls, /onPanResponderGrant/);
+  assert.match(controls, /onPanResponderMove/);
+  assert.match(controls, /selectionFromProfileGesture/);
+  assert.match(controls, /xToProfileDistance/);
+  assert.match(controls, /startHandleResponder\.panHandlers/);
+  assert.match(controls, /endHandleResponder\.panHandlers/);
+  assert.match(controls, /<View\s+accessible\s+accessibilityRole="adjustable"\s+accessibilityLabel="Selection start"/);
+  assert.match(controls, /<View\s+accessible\s+accessibilityRole="adjustable"\s+accessibilityLabel="Selection end"/);
+  assert.match(controls, /width: 44/);
+  assert.match(controls, /accessibilityLabel="Profile position"/);
+  assert.match(controls, /accessibilityLabel="Selection start"/);
+  assert.match(controls, /accessibilityLabel="Selection end"/);
+  assert.match(controls, /accessibilityActions/);
+  assert.match(controls, /onAccessibilityAction/);
+  assert.match(screen, /trimPreview/);
+  assert.match(screen, /onTrimPreview/);
+  assert.match(screen, /onTrimCommit/);
+  assert.match(screen, /getGeometryForRange/);
+  assert.match(screen, /getMetricsForRange/);
+  assert.doesNotMatch(screen, /trimDraft/);
+  assert.match(controls, /gestureMovedRef/);
+  assert.doesNotMatch(screen, /profileMode|setProfileMode/);
+  assert.doesNotMatch(controls, /modeRow|onMode|Inspect profile|ProfileMode/);
+  assert.doesNotMatch(viewModel, /Platform\.OS|android|ios/i);
 });
 
 test("private drafts persist only in the application document sandbox", () => {
@@ -202,11 +237,18 @@ test("release signing uses a generated home debug keystore rather than a repo-lo
   const source = read("android/app/build.gradle");
   const buildScript = read("../../scripts/build-apk.sh");
   const cleanScript = read("../../scripts/device/clean-generated.sh");
+  const prepareCxx = read("../../scripts/device/prepare-cxx-dirs.mjs");
   assert.match(source, /System\.getProperty\('user\.home'\)/);
   assert.match(source, /ensureDemoDebugKeystore/);
   assert.doesNotMatch(source, /storeFile file\('debug\.keystore'\)/);
   assert.match(buildScript, /scripts\/device\/clean-generated\.sh/);
-  assert.match(buildScript, /clean assembleRelease/);
+  assert.match(buildScript, /node22_bin=/);
+  assert.match(buildScript, /gradlew[\s\S]*clean/);
+  assert.match(buildScript, /configureCMakeRelWithDebInfo\[arm64-v8a\]/);
+  assert.match(buildScript, /configureCMakeRelWithDebInfo\[x86_64\]/);
+  assert.match(buildScript, /scripts\/device\/prepare-cxx-dirs\.mjs/);
+  assert.match(buildScript, /gradlew[\s\S]*assembleRelease --rerun-tasks/);
+  assert.match(buildScript, /PATH=\"\$node22_bin:\$PATH\" NODE_ENV=production/);
   assert.match(buildScript, /assembleRelease --rerun-tasks/);
   assert.match(buildScript, /--max-workers=1/);
   assert.doesNotMatch(cleanScript, /apps\/mobile\/android\/build/);
@@ -218,6 +260,9 @@ test("release signing uses a generated home debug keystore rather than a repo-lo
   assert.match(cleanScript, /\[\[ \"\$#\" -ne 0 \]\]/);
   assert.match(cleanScript, /usage: clean-generated\.sh/);
   assert.doesNotMatch(cleanScript, /generated_targets=\(\"\$@\"\)/);
+  assert.match(prepareCxx, /usage: prepare-cxx-dirs\.mjs/);
+  assert.match(prepareCxx, /-o/);
+  assert.match(prepareCxx, /-MF/);
 });
 
 test("android release build disables lintVital so the public demo APK does not depend on transitive lint metadata", () => {

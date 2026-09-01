@@ -157,6 +157,11 @@ android {
         jniLibs {
             def enableLegacyPackaging = findProperty('expo.useLegacyPackaging') ?: 'false'
             useLegacyPackaging enableLegacyPackaging.toBoolean()
+            // The public offline router package also references core RN shared
+            // libraries through its JNI copy step when the app builds on the
+            // legacy architecture. Package the app with the canonical copies
+            // from react-android and keep the Rust/Nitro binaries intact.
+            pickFirsts += ["**/libjsi.so", "**/libreactnative.so"]
         }
     }
     androidResources {
@@ -170,6 +175,10 @@ android {
 preBuild.dependsOn(tasks.named("ensureDemoDebugKeystore"))
 tasks.matching { it.name == "createBundleReleaseJsAndAssets" }.configureEach {
     dependsOn(tasks.named("prepareReleaseSourcemapDir"))
+    doFirst {
+        releaseIntermediatesSourcemapDir.get().asFile.mkdirs()
+        releaseGeneratedSourcemapDir.get().asFile.mkdirs()
+    }
 }
 tasks.matching { it.name.startsWith("configureCMakeRelWithDebInfo") || it.name.startsWith("buildCMakeRelWithDebInfo") }.configureEach {
     dependsOn(tasks.named("generateAutolinkingNewArchitectureFiles"))

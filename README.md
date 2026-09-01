@@ -12,7 +12,7 @@ The recruiter flow is simple:
 
 1. open the web viewer, install the APK, or inspect the iOS simulator build;
 2. create a route with start, finish, and via points;
-3. inspect the local route, elevation profile, trim selection, and 2D/3D map mode;
+3. inspect the local route, drag the elevation cut handles, and switch 2D/3D map mode;
 4. confirm publication of a named snapshot;
 5. read the same published segment back through the live API.
 
@@ -40,6 +40,9 @@ and no business vocabulary or artifacts from the product repo.
 - one shared `packages/route-studio` domain for multipoint editing, invalidated-leg
   reroute, undo/redo, loop, trim, elevation metrics, draft persistence, and explicit
   `draft -> ready -> publishing -> published` transitions;
+- one direct elevation-cut interaction on mobile and web: the web uses native
+  ranges, while Android and iOS share a React Native SVG profile selector with
+  tactile start/end handles and the same non-destructive trim state;
 - a Cloudflare Worker + D1 API with exact input validation, idempotency, server-derived
   metrics, z14 spatial cells, TTL, and fail-closed rate limiting;
 - TDD with unit, integration, E2E, device, coverage, and public-boundary checks.
@@ -149,7 +152,11 @@ fails if a `/route` request appears on the network. The map starts in 3D and
 can be switched to 2D without breaking route overlays. In both clients, the
 active route uses a three-layer stack: dark shadow, paper casing, and ochre
 core. Selected trims and profile cursors use their own halo so the route stays
-visible over 3D building extrusion.
+visible over 3D building extrusion. On mobile, the elevation chart is a direct
+SVG range selector: tap the profile to inspect it, or drag its dedicated
+start/end handles to preview the selected geometry and D+/D- immediately. The
+trim is persisted once when the gesture ends. The 44 pt handle targets and
+adjustable accessibility actions are shared by the Android APK and iOS app.
 
 ### iOS simulator path
 

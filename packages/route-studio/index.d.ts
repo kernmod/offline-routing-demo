@@ -44,6 +44,8 @@ export function trimDraft(draft: RouteStudioDraft, startM: number, endM: number)
 export function resetToFullSelection(draft: RouteStudioDraft): RouteStudioDraft;
 export function getTrimmedGeometry(draft: RouteStudioDraft): GeometryPoint[];
 export function getSelectionMetrics(draft: RouteStudioDraft): DraftMetrics;
+export function getGeometryForRange(draft: RouteStudioDraft, startM: number, endM: number): GeometryPoint[];
+export function getMetricsForRange(draft: RouteStudioDraft, startM: number, endM: number): DraftMetrics;
 export function getElevationProfile(draft: RouteStudioDraft): ProfilePoint[];
 export function lookupProfileAtDistance(draft: RouteStudioDraft, distanceM: number): ProfilePoint | null;
 export function prepareDraftForPublication(draft: RouteStudioDraft): RouteStudioDraft;
