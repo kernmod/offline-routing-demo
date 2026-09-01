@@ -269,17 +269,16 @@ ANDROID_SERIAL=localhost:5556 \
 ```
 
 The build generates a demo keystore under `$HOME` only. No signing material is
-committed. The published `v0.3.0` asset has SHA-256
-`d4a4e6b1f10f74c0a63f614e1c5d57400e9b7037c9ab6b4bfdb443d2e36d6b1a`.
-Its cartography-3D release gate was run in airplane mode and is recorded in
-[`docs/evidence/2026-09-01T03-59-40Z-release-device.txt`](docs/evidence/2026-09-01T03-59-40Z-release-device.txt).
-The route-visibility build for `v0.4.0` was also verified in airplane mode on
-`redroid14_x86_64` / Android 14 with `route=local_native`; its APK SHA-256 is
-`bed72cc37e2dfc84f2d6920e66f33731be234f616ed93c6c49c60072e0186bcc` and
-the gate is recorded in
-[`docs/evidence/2026-09-01T06-23-00Z-release-device.txt`](docs/evidence/2026-09-01T06-23-00Z-release-device.txt).
-The earlier three-control-point loop and undo/redo replay remains documented in
-[`docs/evidence/2026-09-01T01-51-18Z-release-multipoint-airplane.txt`](docs/evidence/2026-09-01T01-51-18Z-release-multipoint-airplane.txt).
+committed. The current `v0.5.0` APK has SHA-256
+`8eab7a13155e7c8fb28a39188ff48b23e78c509047c171c16f8901b34a14b9ee`.
+Its clean release gate and direct elevation-handle drag were verified in airplane
+mode on `redroid14_x86_64` / Android 14 with `route=local_native`, and are recorded
+in [`docs/evidence/2026-09-01T10-20-46Z-elevation-cut-android.md`](docs/evidence/2026-09-01T10-20-46Z-elevation-cut-android.md).
+Historical release and multipoint replay evidence remains available under
+[`docs/evidence`](docs/evidence).
+The retained baselines are `v0.3.0`
+(`d4a4e6b1f10f74c0a63f614e1c5d57400e9b7037c9ab6b4bfdb443d2e36d6b1a`)
+and the [`v0.4.0` visibility gate](docs/evidence/2026-09-01T06-23-00Z-release-device.txt).
 The adjacent checksum asset uses the APK basename, so `sha256sum -c` works
 after downloading both files into any directory.
 
