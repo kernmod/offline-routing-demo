@@ -24,8 +24,11 @@ and no business vocabulary or artifacts from the product repo.
 
 - Browser viewer: <https://kernmod.github.io/offline-routing-demo/>
 - Segment API health: <https://offline-routing-segments.yaktrak.workers.dev/health>
-- Android APK: <https://github.com/kernmod/offline-routing-demo/releases/download/v0.3.0/offline-routing-demo-route-studio.apk>
-- iOS simulator build and runtime evidence: [GitHub Actions workflow `ios`](https://github.com/kernmod/offline-routing-demo/actions/workflows/ios.yml)
+- Android APK: <https://github.com/kernmod/offline-routing-demo/releases/latest/download/offline-routing-demo-route-studio.apk>
+- iOS Simulator app: <https://github.com/kernmod/offline-routing-demo/releases/latest/download/offline-routing-demo-ios-simulator-app.zip>
+- iOS Rust XCFramework: <https://github.com/kernmod/offline-routing-demo/releases/latest/download/offline-routing-demo-ios-rust-xcframework.zip>
+- iOS runtime evidence: <https://github.com/kernmod/offline-routing-demo/releases/latest/download/offline-routing-demo-ios-simulator-evidence.zip>
+- Reproducible macOS run: [GitHub Actions workflow `ios`](https://github.com/kernmod/offline-routing-demo/actions/workflows/ios.yml)
 
 ## What this demonstrates
 

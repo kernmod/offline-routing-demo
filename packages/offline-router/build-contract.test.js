@@ -70,6 +70,10 @@ test("ios packaging builds public Rust libraries into a required XCFramework", (
   assert.match(podspec, /Check OfflineRouterCore\.xcframework/);
   assert.match(podspec, /load 'nitrogen\/generated\/ios\/OfflineRouter\+autolinking\.rb'/);
   assert.match(readme, /local-path integration, not a\s+CocoaPods registry package/);
+  assert.match(readme, /releases\/latest\/download\/offline-routing-demo-route-studio\.apk/);
+  assert.match(readme, /releases\/latest\/download\/offline-routing-demo-ios-simulator-app\.zip/);
+  assert.match(readme, /releases\/latest\/download\/offline-routing-demo-ios-rust-xcframework\.zip/);
+  assert.match(readme, /releases\/latest\/download\/offline-routing-demo-ios-simulator-evidence\.zip/);
   assert.match(workspaceCargo, /crates\/offline-routing-mobile-core/);
   assert.match(aggregatorCargo, /name = "offline-routing-mobile-core"/);
   assert.match(aggregatorCargo, /crate-type = \["rlib", "staticlib"\]/);
