@@ -93,7 +93,10 @@ migrations, deploys the Worker, then reruns the live `POST /v2/segments` and
 ### Local verification
 
 Prerequisites: Node `22.23.2`, pnpm `10.24.0`, Rust `1.94.1`,
-`cargo-llvm-cov 0.9.0`, Android SDK 36 for the release APK.
+`cargo-llvm-cov 0.9.0`, Android SDK 36 for the release APK. The Rust coverage
+gate excludes the browser-only `cch-routing-lite-wasm` crate because its tests
+are already covered by `pnpm build:wasm` plus viewer parity and E2E checks
+rather than a native host runner.
 
 ```bash
 pnpm install --frozen-lockfile
@@ -104,7 +107,7 @@ make verify-fixture
 pnpm build:wasm
 pnpm test:coverage
 cargo test --workspace
-cargo llvm-cov --workspace --all-targets --fail-under-lines 80
+cargo llvm-cov --workspace --all-targets --exclude cch-routing-lite-wasm --fail-under-lines 80
 pnpm audit:public
 ```
 
@@ -151,9 +154,9 @@ device only.
 Current named-device run on 2026-09-01:
 
 - device: `redroid14_x86_64 isolated (AX102)`
-- warm-query p50: `1,212 µs`
-- warm-query p95: `1,674 µs`
-- cold pack-load: `136,366 µs`
+- warm-query p50: `1,183 µs`
+- warm-query p95: `1,641 µs`
+- cold pack-load: `97,380 µs`
 
 Retained 20-run named-device baseline from 2026-08-31:
 

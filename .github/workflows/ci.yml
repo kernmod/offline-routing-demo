@@ -42,7 +42,7 @@ jobs:
       - name: Run Rust lint
         run: cargo clippy --workspace --all-targets -- -D warnings
       - name: Run Rust coverage
-        run: cargo llvm-cov --workspace --all-targets --lcov --output-path coverage/rust.lcov --fail-under-lines 80
+        run: cargo llvm-cov --workspace --all-targets --exclude cch-routing-lite-wasm --lcov --output-path coverage/rust.lcov --fail-under-lines 80
       - name: Upload JavaScript LCOV evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

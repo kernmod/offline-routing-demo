@@ -67,7 +67,7 @@ The Route Studio build order is enforced by tests:
 | P6 mobile package | `pnpm coverage:mobile` | 48 tests, 95.55% lines, 83.93% branches, 90.76% funcs | green |
 | P7 browser E2E | `pnpm --filter @offline-routing/viewer test:e2e` | 6/6 pass desktop + mobile viewport | green |
 | P8 root coverage | `pnpm test:coverage` | LCOV_OK for root, mobile, offline-router, api, viewer, and shared | green |
-| P8 Rust coverage | `cargo llvm-cov --workspace --all-targets --fail-under-lines 80` | `coverage/rust.lcov` regenerated, gate passed | green |
+| P8 Rust coverage | `cargo llvm-cov --workspace --all-targets --exclude cch-routing-lite-wasm --fail-under-lines 80` | `coverage/rust.lcov` regenerated; the browser-only WASM crate stays covered by `pnpm build:wasm` and viewer parity/E2E gates | green |
 | P8 live `v2` | `pnpm verify:live-api --url <worker>` | current old public API still needs redeploy from `main`; local deploy contract and verifier are green | pending deploy |
 
 ## Command reference
@@ -83,7 +83,7 @@ pnpm --filter @offline-routing/api test:coverage
 pnpm --filter @offline-routing/route-studio test:coverage
 
 cargo test --workspace
-cargo llvm-cov --workspace --all-targets --fail-under-lines 80
+cargo llvm-cov --workspace --all-targets --exclude cch-routing-lite-wasm --fail-under-lines 80
 
 make fixture
 make verify-fixture

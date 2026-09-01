@@ -220,7 +220,10 @@ test("live API verification is explicit and stays outside the offline local gate
   assert.equal(manifest.scripts["verify:live-api"], "node tools/live/verify-api.mjs");
   assert.match(manifest.scripts["test:root"], /tools\/live\/\*\.test\.mjs/);
   assert.match(manifest.scripts["coverage:root"], /tools\/live\/verify-api-lib\.mjs/);
-  assert.match(makefile, /^verify-live-api:\n\tpnpm verify:live-api$/m);
+  assert.match(
+    makefile,
+    /^verify-live-api:\n\t(?:pnpm verify:live-api|\$\(NODE22\) "pnpm verify:live-api")$/m
+  );
   assert.match(readme, /pnpm verify:live-api --url https:\/\/<worker-origin>/);
   assert.match(testing, /pnpm verify:live-api --url https:\/\/your-worker\.workers\.dev/);
   assert.doesNotMatch(`${readme}\n${testing}`, /verify:live-api -- --url/);
