@@ -29,6 +29,7 @@ and no business vocabulary or artifacts from the product repo.
 - iOS Rust XCFramework: <https://github.com/kernmod/offline-routing-demo/releases/latest/download/offline-routing-demo-ios-rust-xcframework.zip>
 - iOS runtime evidence: <https://github.com/kernmod/offline-routing-demo/releases/latest/download/offline-routing-demo-ios-simulator-evidence.zip>
 - Reproducible macOS run: [GitHub Actions workflow `ios`](https://github.com/kernmod/offline-routing-demo/actions/workflows/ios.yml)
+- Physical iOS EAS rail: [GitHub Actions workflow `ios-distribution`](https://github.com/kernmod/offline-routing-demo/actions/workflows/ios-distribution.yml)
 
 ## What this demonstrates
 
@@ -184,8 +185,57 @@ The iOS packaging path is intentionally public and narrow:
 - the public `offlineroutingdemo://route?...` deep link remains available for
   normal manual use.
 
-Physical iPhone installation is not part of the secret-free public scope. That
-would require Apple signing credentials provided outside this repository.
+Physical iPhone installation uses EAS remote credentials only. Nothing Apple is
+committed here: the repo expects `EXPO_TOKEN`, and for CI-based ad hoc/TestFlight
+distribution it can also consume `EXPO_ASC_API_KEY_PATH` or a temporary file
+derived from `EXPO_ASC_API_KEY_BASE64`, plus `EXPO_ASC_KEY_ID` and
+`EXPO_ASC_ISSUER_ID`. If the Expo project already stores its App Store Connect
+key remotely, `EXPO_TOKEN` alone is sufficient for the public workflow and
+`ios-distribution.yml` skips local key material injection.
+
+For this demo, there are two physical-device rails:
+
+- `ios-internal`: ad hoc internal distribution for enrolled devices only;
+- `ios-testflight`: store-signed build for App Store Connect upload and TestFlight
+  processing.
+
+The manual GitHub workflow is
+[`ios-distribution.yml`](.github/workflows/ios-distribution.yml). It runs on
+Linux because EAS Build and EAS Submit handle iOS cloud signing and App Store
+Connect upload remotely.
+
+Local commands are the same:
+
+```bash
+pnpm install --frozen-lockfile
+
+cd apps/mobile
+../../node_modules/.bin/eas whoami
+../../node_modules/.bin/eas build --platform ios --profile ios-internal --non-interactive
+../../node_modules/.bin/eas build --platform ios --profile ios-testflight --non-interactive
+../../node_modules/.bin/eas submit --platform ios --profile production --latest --non-interactive
+```
+
+Package scripts mirror those commands:
+
+- `pnpm --dir apps/mobile run build:ios-internal`
+- `pnpm --dir apps/mobile run build:ios-internal:refresh`
+- `pnpm --dir apps/mobile run build:ios-testflight`
+- `pnpm --dir apps/mobile run submit:ios-testflight`
+
+The current public project-state evidence is
+[`docs/evidence/2026-09-01T07-51-19Z-ios-eas-attempt.md`](docs/evidence/2026-09-01T07-51-19Z-ios-eas-attempt.md):
+Expo authentication and project linking succeed, but non-interactive physical
+iOS delivery is still blocked by remote credential bootstrap for
+`dev.offlinerouting.demo`.
+
+The account-level distribution certificate can be reused across apps, but
+`dev.offlinerouting.demo` still needs its own App ID and provisioning profile.
+An ad hoc internal build also requires at least one enrolled device.
+Once an App Store Connect API key exists for the project, rerun
+`pnpm --dir apps/mobile run build:ios-internal:refresh`, which expands to
+`eas build --platform ios --profile ios-internal --non-interactive --refresh-ad-hoc-provisioning-profile`,
+to let EAS refresh the Expo-managed ad hoc profile non-interactively.
 
 ### Android release and device gate
 
@@ -273,8 +323,9 @@ pnpm verify:live-api --url https://<worker-origin>
 - The API stores generic geometry and metrics, not identities or product logic.
 - The benchmark evidence is honest about the named emulator until an arm64 phone
   run is added.
-- The public iOS proof is an unsigned simulator build plus runtime evidence, not
-  an App Store or TestFlight delivery.
+- Physical iOS delivery depends on the remote Expo/Apple project state for
+  `dev.offlinerouting.demo`: App ID, provisioning profile, enrolled ad hoc
+  devices, and optionally an App Store Connect app for TestFlight.
 
 ## Data and licensing
 

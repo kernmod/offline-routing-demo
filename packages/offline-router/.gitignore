@@ -1,5 +1,4 @@
 node_modules/
-nitrogen/generated/
 android/src/main/jniLibs/
 android/build/
 /ios/build/

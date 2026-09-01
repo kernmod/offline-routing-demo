@@ -33,7 +33,14 @@
       ]
     },
     "ios": {
-      "bundleIdentifier": "dev.offlinerouting.demo"
-    }
+      "bundleIdentifier": "dev.offlinerouting.demo",
+      "supportsTablet": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "1dd962e3-3f2c-4a4f-ad78-58eb973cdd07"
+      }
+    },
+    "owner": "milo78"
   }
 }

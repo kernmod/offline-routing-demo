@@ -44,6 +44,7 @@ jobs:
       - name: Generate the public Nitro bridge and offline assets
         run: |
           pnpm --filter react-native-offline-router exec nitrogen
+          git diff --exit-code -- packages/offline-router/nitrogen/generated
           pnpm --filter @offline-routing/mobile prepare:assets
 
       - name: Build the single Rust XCFramework
