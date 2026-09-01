@@ -63,7 +63,7 @@ The Route Studio build order is enforced by tests:
 | P3 Rust native/FFI | `cargo test --workspace` | Rust core, FFI, WASM, tile server all pass | green |
 | P4 WASM build | `pnpm build:wasm` | pinned Rust 1.94.1 and wasm-bindgen 0.2.127 build passes | green |
 | P4 viewer parity | `pnpm --filter @offline-routing/viewer test:coverage` | 42 tests, 94.66% lines, 82.75% branches, 91.30% funcs, including real generated-WASM parity on the committed pack | green |
-| P5 API | `pnpm --filter @offline-routing/api test:coverage` | 27 tests, 98.97% lines, 90.62% branches, 100% funcs | green |
+| P5 API | `pnpm --filter @offline-routing/api test:coverage` | 29 tests, 99.29% lines, 90.63% branches, 100% funcs | green |
 | P6 mobile package | `pnpm coverage:mobile` | 48 tests, 95.55% lines, 83.93% branches, 90.76% funcs | green |
 | P7 browser E2E | `pnpm --filter @offline-routing/viewer test:e2e` | 6/6 pass desktop + mobile viewport | green |
 | P8 root coverage | `pnpm test:coverage` | LCOV_OK for root, mobile, offline-router, api, viewer, and shared | green |
@@ -100,7 +100,8 @@ pnpm verify:live-api --url https://your-worker.workers.dev
 - Rust tests for `routeMany`, pack versioning, shortcut unpacking, ownership, and
   browser/native boundary errors;
 - D1 integration tests for migrations, idempotency, conflict, TTL, rate-limit,
-  indexed cell query path, and exact bbox reads;
+  bounded streaming request reads, the 10-record response cap, indexed cell query
+  path, and exact bbox reads;
 - browser tests for WASM routing, editing, trimming, confirmation, publish, and
   mobile viewport accessibility;
 - mobile controller tests for offline editing, retry, persistence, and network

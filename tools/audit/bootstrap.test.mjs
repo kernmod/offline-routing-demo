@@ -235,9 +235,11 @@ test("architecture and public boundary stay honest about live delivery status", 
   const architecture = read("docs/architecture.md");
   const boundary = read("docs/security/public-boundary.md");
   const readiness = read("docs/security/public-readiness.md");
-  assert.match(architecture, /public[\s\S]*production URLs still need a redeploy from `main` before `v2` live verification/i);
-  assert.match(readiness, /public live[\s\S]*verification is pending the next `main` deployment/i);
-  assert.match(readiness, /returns `404` on `POST \/v2\/segments`/i);
+  const deliveryStatus = `${architecture}\n${readiness}`;
+  assert.match(architecture, /public production URLs now serve the `v1\.1` contract[\s\S]*deployed `main` baseline/i);
+  assert.match(readiness, /public live[\s\S]*verification is closed[\s\S]*deployed `main` baseline/i);
+  assert.match(readiness, /LIVE_API_OK health=200 publish=201 replay=200 conflict=409 nearby=200/);
+  assert.doesNotMatch(deliveryStatus, /still need a redeploy|verification is pending/i);
   assert.match(architecture, /Nitro bridge.*Rust CCH/i);
   assert.match(architecture, /PMTiles/i);
   assert.match(boundary, /clean history/i);
