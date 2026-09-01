@@ -110,6 +110,30 @@ test("mobile map exposes a local 2D/3D cartography mode", () => {
   assert.match(source, /androidView="texture"/);
 });
 
+test("mobile route overlays use a high-contrast layer stack over 3D buildings", () => {
+  const source = read("App.tsx");
+  assert.match(source, /id="route-shadow-line"/);
+  assert.match(source, /id="route-casing-line"/);
+  assert.match(source, /id="route-line"/);
+  assert.match(source, /id="selected-route-shadow-line"/);
+  assert.match(source, /id="selected-route-casing-line"/);
+  assert.match(source, /id="selected-route-line"/);
+  assert.match(source, /id="control-point-halo"/);
+  assert.match(source, /id="profile-cursor-halo"/);
+  assert.ok(source.indexOf('id="route-shadow-line"') < source.indexOf('id="route-casing-line"'));
+  assert.ok(source.indexOf('id="route-casing-line"') < source.indexOf('id="route-line"'));
+  assert.ok(source.indexOf('id="selected-route-shadow-line"') < source.indexOf('id="selected-route-casing-line"'));
+  assert.ok(source.indexOf('id="selected-route-casing-line"') < source.indexOf('id="selected-route-line"'));
+  assert.match(source, /"line-color": "#111611"/);
+  assert.match(source, /"line-color": "#f7ead0"/);
+  assert.match(source, /"line-color": "#f2b36f"/);
+  assert.match(source, /"line-color": "#c4663a"/);
+  assert.match(source, /"line-blur": 1/);
+  assert.match(source, /"line-width": 16/);
+  assert.match(source, /"line-width": 12/);
+  assert.match(source, /"line-width": 6/);
+});
+
 test("network capability is quarantined behind the explicit publish and refresh actions", () => {
   const source = read("src/networkApi.ts");
   assert.match(source, /export async function publishSegment/);
@@ -125,6 +149,20 @@ test("the native package exposes only router and local tile-server operations", 
   assert.match(source, /benchmark/);
   assert.match(source, /startTileServer/);
   assert.doesNotMatch(source, /sensor|location|account|wallet|motion/i);
+});
+
+test("the native package exposes the same routing-only Nitro surface on iOS", () => {
+  const podspec = read("../../packages/offline-router/OfflineRouter.podspec");
+  const buildContract = read("../../packages/offline-router/build-contract.test.js");
+  const infoPlist = read("ios/mobile/Info.plist");
+  assert.match(podspec, /ios\/OfflineRouterCore\.xcframework/);
+  assert.match(podspec, /OfflineRouter\+autolinking\.rb/);
+  assert.match(podspec, /-x objective-c\+\+/);
+  assert.match(podspec, /Check OfflineRouterCore\.xcframework/);
+  assert.match(buildContract, /build-ios-rust-xcframework\.sh/);
+  assert.match(infoPlist, /CFBundleURLTypes/);
+  assert.match(infoPlist, /offlineroutingdemo/);
+  assert.match(infoPlist, /NSAllowsLocalNetworking/);
 });
 
 test("no JavaScript graph or shortest-path implementation is shipped beside the native bridge", () => {

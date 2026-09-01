@@ -255,32 +255,66 @@ export default function App() {
             />
             <GeoJSONSource id="route-source" data={routeFeature as never}>
               <Layer
+                id="route-shadow-line"
+                type="line"
+                paint={{ "line-color": "#111611", "line-width": 16, "line-opacity": 0.64, "line-blur": 1 }}
+                layout={{ "line-cap": "round", "line-join": "round" }}
+              />
+              <Layer
+                id="route-casing-line"
+                type="line"
+                paint={{ "line-color": "#f7ead0", "line-width": 12, "line-opacity": 0.98 }}
+                layout={{ "line-cap": "round", "line-join": "round" }}
+              />
+              <Layer
                 id="route-line"
                 type="line"
-                paint={{ "line-color": "#718071", "line-width": 7, "line-opacity": 0.7 }}
+                paint={{ "line-color": "#f2b36f", "line-width": 6 }}
                 layout={{ "line-cap": "round", "line-join": "round" }}
               />
             </GeoJSONSource>
             <GeoJSONSource id="selected-route-source" data={selectedFeature as never}>
               <Layer
+                id="selected-route-shadow-line"
+                type="line"
+                paint={{ "line-color": "#111611", "line-width": 13, "line-opacity": 0.68, "line-blur": 0.8 }}
+                layout={{ "line-cap": "round", "line-join": "round" }}
+              />
+              <Layer
+                id="selected-route-casing-line"
+                type="line"
+                paint={{ "line-color": "#f7ead0", "line-width": 10, "line-opacity": 0.98 }}
+                layout={{ "line-cap": "round", "line-join": "round" }}
+              />
+              <Layer
                 id="selected-route-line"
                 type="line"
-                paint={{ "line-color": "#d2a16f", "line-width": 5 }}
+                paint={{ "line-color": "#c4663a", "line-width": 5 }}
                 layout={{ "line-cap": "round", "line-join": "round" }}
               />
             </GeoJSONSource>
             <GeoJSONSource id="control-point-source" data={controlFeature as never}>
               <Layer
+                id="control-point-halo"
+                type="circle"
+                paint={{ "circle-color": "#111611", "circle-radius": 11, "circle-opacity": 0.34 }}
+              />
+              <Layer
                 id="control-point-circle"
                 type="circle"
-                paint={{ "circle-color": "#eee9dc", "circle-radius": 7, "circle-stroke-color": "#1a1d1a", "circle-stroke-width": 3 }}
+                paint={{ "circle-color": "#eee9dc", "circle-radius": 8, "circle-stroke-color": "#1a1d1a", "circle-stroke-width": 3.5 }}
               />
             </GeoJSONSource>
             <GeoJSONSource id="profile-cursor-source" data={cursorFeature as never}>
               <Layer
+                id="profile-cursor-halo"
+                type="circle"
+                paint={{ "circle-color": "#f7ead0", "circle-radius": 11, "circle-opacity": 0.98 }}
+              />
+              <Layer
                 id="profile-cursor-circle"
                 type="circle"
-                paint={{ "circle-color": "#a5c294", "circle-radius": 6, "circle-stroke-color": "#1a1d1a", "circle-stroke-width": 2 }}
+                paint={{ "circle-color": "#9ab88a", "circle-radius": 5, "circle-stroke-color": "#111611", "circle-stroke-width": 1 }}
               />
             </GeoJSONSource>
           </MapView>

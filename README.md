@@ -3,13 +3,14 @@
 This repository is a public Route Studio built to show end-to-end engineering
 without exposing product-specific logic. It packages one reproducible Sydney
 fixture, one Rust CCH routing engine, one shared editing state machine, an
-offline-first Android client, an install-free web client, and a bounded
-publish/read API. The public cartography includes a neutral 3D/stylized map
-based on regenerated public fixture bytes, not on any private map artifact.
+offline-first Android client, a public iOS build path, an install-free web
+client, and a bounded publish/read API. The public cartography includes a
+neutral 3D/stylized map based on regenerated public fixture bytes, not on any
+private map artifact.
 
 The recruiter flow is simple:
 
-1. open the web viewer or install the APK;
+1. open the web viewer, install the APK, or inspect the iOS simulator build;
 2. create a route with start, finish, and via points;
 3. inspect the local route, elevation profile, trim selection, and 2D/3D map mode;
 4. confirm publication of a named snapshot;
@@ -24,13 +25,14 @@ and no business vocabulary or artifacts from the product repo.
 - Browser viewer: <https://kernmod.github.io/offline-routing-demo/>
 - Segment API health: <https://offline-routing-segments.yaktrak.workers.dev/health>
 - Android APK: <https://github.com/kernmod/offline-routing-demo/releases/download/v0.3.0/offline-routing-demo-route-studio.apk>
+- iOS simulator CI artifacts: GitHub Actions workflow `ios` on this repository
 
 ## What this demonstrates
 
 - deterministic fixture production from pinned public OpenStreetMap and DEM inputs;
 - a regenerated public PMTiles map with 3D building extrusion and a neutral style;
 - a real Rust CCH engine with preprocessing, shortcut unpacking, and multipoint routing;
-- the same router compiled to Nitro/native on Android and to WASM in the browser;
+- the same router compiled to Nitro/native on Android and iOS, and to WASM in the browser;
 - one shared `packages/route-studio` domain for multipoint editing, invalidated-leg
   reroute, undo/redo, loop, trim, elevation metrics, draft persistence, and explicit
   `draft -> ready -> publishing -> published` transitions;
@@ -48,7 +50,8 @@ public Sydney OSM + DEM
                                       │
                  ┌────────────────────┴────────────────────┐
                  v                                         v
-        React Native + Nitro                    React + WASM + MapLibre GL JS
+     React Native + Nitro/C++                     React + WASM + MapLibre GL JS
+   Android .so + iOS XCFramework                           │
                  │                                         │
                  └──── packages/route-studio draft state ─┘
                                       │
@@ -71,6 +74,7 @@ graph fallback.
 | `crates/cch-routing-lite` | CCH pack build/load/query, `routeMany`, elevation-aware unpack |
 | `crates/cch-routing-lite-wasm` | browser WASM boundary for the same pack |
 | `crates/cch-routing-lite-ffi` | ownership-safe C ABI |
+| `crates/offline-routing-mobile-core` | single iOS `staticlib` aggregator for the public routing and loopback tile ABIs |
 | `crates/tile-server-lite` | loopback-only PMTiles/style serving for Android |
 | `packages/offline-router` | Nitro/C++ mobile bridge |
 | `packages/shared` | geometry, bbox, metric, and API contracts |
@@ -88,7 +92,10 @@ graph fallback.
 The viewer and API deploy from `main`. The pages workflow publishes the static
 viewer under `/offline-routing-demo/`; the API workflow applies remote D1
 migrations, deploys the Worker, then reruns the live `POST /v2/segments` and
-`GET /v2/segments?bbox=...` contract verifier.
+`GET /v2/segments?bbox=...` contract verifier. The iOS workflow runs on
+GitHub-hosted macOS, builds the XCFramework from public Rust crates only,
+compiles the unsigned simulator app, boots a named simulator, opens a route
+deep link, and archives the runtime evidence.
 
 ## Reproduce it
 
@@ -113,6 +120,9 @@ cargo llvm-cov --workspace --all-targets --exclude cch-routing-lite-wasm --fail-
 pnpm audit:public
 ```
 
+If your shell is still pinned to Node 20, the repository scripts will emit an
+engine warning. CI and the reproducible local contract target Node 22.23.2.
+
 `make fixture` is offline after checkout. The current public routing pack is
 `CCHP2` and the committed fixture manifest records provenance, sizes, checksums,
 DEM source licensing, and the routing-pack SHA-256. `make build`, CI, and Pages
@@ -132,7 +142,41 @@ pnpm --filter @offline-routing/mobile build
 
 The browser viewer uses the same `routing.pack` bytes as mobile. The E2E suite
 fails if a `/route` request appears on the network. The map starts in 3D and
-can be switched to 2D without breaking route overlays.
+can be switched to 2D without breaking route overlays. In both clients, the
+active route uses a three-layer stack: dark shadow, paper casing, and ochre
+core. Selected trims and profile cursors use their own halo so the route stays
+visible over 3D building extrusion.
+
+### iOS simulator path
+
+```bash
+pnpm --filter react-native-offline-router exec nitrogen
+pnpm --filter @offline-routing/mobile prepare:assets
+packages/offline-router/scripts/build-ios-rust-xcframework.sh
+cd apps/mobile/ios && pod install
+xcodebuild \
+  -workspace mobile.xcworkspace \
+  -scheme mobile \
+  -configuration Release \
+  -sdk iphonesimulator \
+  -destination 'generic/platform=iOS Simulator' \
+  CODE_SIGNING_ALLOWED=NO \
+  CODE_SIGNING_REQUIRED=NO \
+  build
+```
+
+The iOS packaging path is intentionally public and narrow:
+
+- one Rust `staticlib` crate, `offline-routing-mobile-core`, retains both the routing
+  and loopback tile-server C ABIs in a single link unit;
+- one `OfflineRouterCore.xcframework` is required by the CocoaPods spec and checked
+  fail-loud before compilation;
+- one simulator smoke script opens `offlineroutingdemo://route?...` and requires the
+  `OfflineRoutingRoute` log to report `routeSource:"local_native"` and
+  `networkAttempts":0`.
+
+Physical iPhone installation is not part of the secret-free public scope. That
+would require Apple signing credentials provided outside this repository.
 
 ### Android release and device gate
 
@@ -215,6 +259,8 @@ pnpm verify:live-api --url https://<worker-origin>
 - The API stores generic geometry and metrics, not identities or product logic.
 - The benchmark evidence is honest about the named emulator until an arm64 phone
   run is added.
+- The public iOS proof is an unsigned simulator build plus runtime evidence, not
+  an App Store or TestFlight delivery.
 
 ## Data and licensing
 

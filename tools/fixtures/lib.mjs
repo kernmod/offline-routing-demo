@@ -732,7 +732,7 @@ function buildStyle() {
           "fill-extrusion-color": "#9b8267",
           "fill-extrusion-height": ["get", "render_height"],
           "fill-extrusion-base": ["get", "render_min_height"],
-          "fill-extrusion-opacity": 0.82,
+          "fill-extrusion-opacity": 0.58,
           "fill-extrusion-vertical-gradient": true,
         },
       },

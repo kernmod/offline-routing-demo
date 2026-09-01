@@ -70,7 +70,7 @@
           "get",
           "render_min_height"
         ],
-        "fill-extrusion-opacity": 0.82,
+        "fill-extrusion-opacity": 0.46,
         "fill-extrusion-vertical-gradient": true
       }
     },

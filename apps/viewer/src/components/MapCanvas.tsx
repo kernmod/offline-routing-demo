@@ -151,28 +151,72 @@ export function MapCanvas({
       map.addSource("draft-controls", { type: "geojson", data: data.controlsGeoJson });
       map.addSource("profile-marker", { type: "geojson", data: data.profileGeoJson });
       map.addLayer({
+        id: "published-segments-casing",
+        type: "line",
+        source: "published-segments",
+        paint: { "line-color": "#111611", "line-width": 8, "line-opacity": 0.86 },
+        layout: { "line-cap": "round", "line-join": "round" }
+      });
+      map.addLayer({
         id: "published-segments-line",
         type: "line",
         source: "published-segments",
-        paint: { "line-color": "#0d6b63", "line-width": 3, "line-opacity": 0.7 }
+        paint: { "line-color": "#9ab88a", "line-width": 4, "line-opacity": 0.96 },
+        layout: { "line-cap": "round", "line-join": "round" }
+      });
+      map.addLayer({
+        id: "draft-route-shadow",
+        type: "line",
+        source: "draft-route",
+        paint: { "line-color": "#111611", "line-width": 16, "line-opacity": 0.64, "line-blur": 1 },
+        layout: { "line-cap": "round", "line-join": "round" }
+      });
+      map.addLayer({
+        id: "draft-route-casing",
+        type: "line",
+        source: "draft-route",
+        paint: { "line-color": "#f7ead0", "line-width": 12, "line-opacity": 0.98 },
+        layout: { "line-cap": "round", "line-join": "round" }
       });
       map.addLayer({
         id: "draft-route-line",
         type: "line",
         source: "draft-route",
-        paint: { "line-color": "#c96f31", "line-width": 4 }
+        paint: { "line-color": "#f2b36f", "line-width": 6 },
+        layout: { "line-cap": "round", "line-join": "round" }
+      });
+      map.addLayer({
+        id: "selected-route-shadow",
+        type: "line",
+        source: "selected-route",
+        paint: { "line-color": "#111611", "line-width": 13, "line-opacity": 0.68, "line-blur": 0.8 },
+        layout: { "line-cap": "round", "line-join": "round" }
+      });
+      map.addLayer({
+        id: "selected-route-casing",
+        type: "line",
+        source: "selected-route",
+        paint: { "line-color": "#f7ead0", "line-width": 10, "line-opacity": 0.98 },
+        layout: { "line-cap": "round", "line-join": "round" }
       });
       map.addLayer({
         id: "selected-route-line",
         type: "line",
         source: "selected-route",
-        paint: { "line-color": "#f0d7a6", "line-width": 5, "line-opacity": 0.9 }
+        paint: { "line-color": "#c4663a", "line-width": 5 },
+        layout: { "line-cap": "round", "line-join": "round" }
+      });
+      map.addLayer({
+        id: "profile-marker-halo",
+        type: "circle",
+        source: "profile-marker",
+        paint: { "circle-radius": 11, "circle-color": "#f7ead0", "circle-opacity": 0.98 }
       });
       map.addLayer({
         id: "profile-marker-circle",
         type: "circle",
         source: "profile-marker",
-        paint: { "circle-radius": 6, "circle-color": "#173c35" }
+        paint: { "circle-radius": 5, "circle-color": "#c4663a", "circle-stroke-color": "#111611", "circle-stroke-width": 1 }
       });
     });
     map.once("idle", () => {
@@ -221,6 +265,12 @@ export function MapCanvas({
       ["==", ["get", "id"], selectedId ?? ""],
       6,
       3
+    ]);
+    map.setPaintProperty("published-segments-casing", "line-width", [
+      "case",
+      ["==", ["get", "id"], selectedId ?? ""],
+      10,
+      7
     ]);
   }, [publishedGeoJson, selectedId]);
 

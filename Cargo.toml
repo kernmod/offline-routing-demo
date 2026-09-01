@@ -3,6 +3,7 @@ members = [
   "crates/cch-routing-lite",
   "crates/cch-routing-lite-ffi",
   "crates/cch-routing-lite-wasm",
+  "crates/offline-routing-mobile-core",
   "crates/tile-server-lite"
 ]
 resolver = "2"

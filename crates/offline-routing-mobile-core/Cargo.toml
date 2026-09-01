@@ -1,0 +1,12 @@
+[package]
+name = "offline-routing-mobile-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+crate-type = ["rlib", "staticlib"]
+
+[dependencies]
+cch-routing-lite-ffi = { path = "../cch-routing-lite-ffi" }
+tile-server-lite = { path = "../tile-server-lite" }

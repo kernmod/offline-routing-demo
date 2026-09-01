@@ -82,11 +82,12 @@ describe("MapCanvas", () => {
     act(() => mapMocks.latest()?.trigger("idle"));
     expect(onTilesReady).toHaveBeenCalledOnce();
     expect(mapMocks.latest()?.addSource).toHaveBeenCalledWith("published-segments", expect.anything());
-    expect(mapMocks.latest()?.addLayer).toHaveBeenCalledTimes(4);
+    expect(mapMocks.latest()?.addLayer).toHaveBeenCalledTimes(10);
 
     rerender(<MapCanvas segments={[segment]} selectedId="seed-sydney-cbd-001" onSelect={vi.fn()} onTilesReady={onTilesReady} onTilesError={vi.fn()} />);
     expect(mapMocks.latest()?.source.setData).toHaveBeenCalledWith(expect.objectContaining({ features: [expect.anything()] }));
     expect(mapMocks.latest()?.setPaintProperty).toHaveBeenCalledWith("published-segments-line", "line-width", expect.any(Array));
+    expect(mapMocks.latest()?.setPaintProperty).toHaveBeenCalledWith("published-segments-casing", "line-width", expect.any(Array));
   });
 
   it("forwards map selection and an early embedded-asset failure", () => {
@@ -165,9 +166,15 @@ describe("MapCanvas", () => {
     expect(screen.getByLabelText("Map of Sydney CBD")).toHaveAttribute("data-map-mode", "3d");
     expect(screen.getByRole("button", { name: "Switch map to 2D" })).toBeVisible();
     expect(mapMocks.latest()?.addLayer.mock.calls.map(([layer]) => (layer as { id: string }).id)).toEqual([
+      "published-segments-casing",
       "published-segments-line",
+      "draft-route-shadow",
+      "draft-route-casing",
       "draft-route-line",
+      "selected-route-shadow",
+      "selected-route-casing",
       "selected-route-line",
+      "profile-marker-halo",
       "profile-marker-circle"
     ]);
 
@@ -179,5 +186,31 @@ describe("MapCanvas", () => {
     act(() => screen.getByRole("button", { name: "Switch map to 3D" }).click());
     expect(mapMocks.latest()?.easeTo).toHaveBeenLastCalledWith({ bearing: -18, duration: 520, pitch: 48 });
     expect(screen.getByLabelText("Map of Sydney CBD")).toHaveAttribute("data-map-mode", "3d");
+  });
+
+  it("renders high-contrast route layers suitable for pitched 3D buildings", () => {
+    render(
+      <MapCanvas
+        segments={[segment]}
+        selectedId="seed-sydney-cbd-001"
+        draftGeometry={[{ lat: -33.8696, lng: 151.2091 }, { lat: -33.8687, lng: 151.21 }]}
+        selectedGeometry={[{ lat: -33.8696, lng: 151.2091 }, { lat: -33.869, lng: 151.2096 }]}
+        onSelect={vi.fn()}
+        onTilesReady={vi.fn()}
+        onTilesError={vi.fn()}
+      />
+    );
+    act(() => mapMocks.latest()?.trigger("load"));
+    const layers = mapMocks.latest()?.addLayer.mock.calls.map(([layer]) => layer as { id: string; paint?: Record<string, unknown>; layout?: Record<string, unknown> }) ?? [];
+    const byId = new Map(layers.map((layer) => [layer.id, layer]));
+
+    expect(byId.get("published-segments-casing")?.paint).toEqual(expect.objectContaining({ "line-color": "#111611", "line-width": 8 }));
+    expect(byId.get("draft-route-shadow")?.paint).toEqual(expect.objectContaining({ "line-color": "#111611", "line-width": 16, "line-blur": 1 }));
+    expect(byId.get("draft-route-casing")?.paint).toEqual(expect.objectContaining({ "line-color": "#f7ead0", "line-width": 12 }));
+    expect(byId.get("draft-route-line")?.paint).toEqual(expect.objectContaining({ "line-color": "#f2b36f", "line-width": 6 }));
+    expect(byId.get("selected-route-shadow")?.paint).toEqual(expect.objectContaining({ "line-color": "#111611", "line-width": 13, "line-blur": 0.8 }));
+    expect(byId.get("selected-route-casing")?.paint).toEqual(expect.objectContaining({ "line-color": "#f7ead0", "line-width": 10 }));
+    expect(byId.get("selected-route-line")?.paint).toEqual(expect.objectContaining({ "line-color": "#c4663a", "line-width": 5 }));
+    expect(byId.get("draft-route-line")?.layout).toEqual(expect.objectContaining({ "line-cap": "round", "line-join": "round" }));
   });
 });
