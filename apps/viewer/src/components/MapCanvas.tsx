@@ -26,6 +26,13 @@ type MapCanvasProps = Readonly<{
   onControlMove?: (id: string, point: GeometryPoint) => void;
 }>;
 
+type MapMode = "2d" | "3d";
+
+const THREE_DIMENSIONAL_VIEW = {
+  bearing: -18,
+  pitch: 48
+} as const;
+
 const EMPTY_GEOJSON = { type: "FeatureCollection", features: [] } as const;
 
 function controlPointFeatures(controlPoints: NonNullable<MapCanvasProps["controlPoints"]>) {
@@ -82,6 +89,7 @@ export function MapCanvas({
   const mapRef = useRef<maplibregl.Map | null>(null);
   const mountedRef = useRef(false);
   const [mapReady, setMapReady] = useState(false);
+  const [mapMode, setMapMode] = useState<MapMode>("3d");
   const publishedGeoJson = useMemo(() => segmentFeatureCollection(segments), [segments]);
   const draftGeoJson = useMemo(() => lineFeature("draft-route", draftGeometry), [draftGeometry]);
   const selectedGeoJson = useMemo(() => lineFeature("selected-route", selectedGeometry), [selectedGeometry]);
@@ -103,6 +111,8 @@ export function MapCanvas({
       style: fixtureStyleUrl(),
       center: [151.2093, -33.8695],
       zoom: 15,
+      pitch: THREE_DIMENSIONAL_VIEW.pitch,
+      bearing: THREE_DIMENSIONAL_VIEW.bearing,
       attributionControl: false
     });
     mapRef.current = map;
@@ -223,17 +233,42 @@ export function MapCanvas({
     (map.getSource("profile-marker") as { setData?: (data: unknown) => void } | undefined)?.setData?.(profileGeoJson);
   }, [controlsGeoJson, draftGeoJson, profileGeoJson, selectedGeoJson]);
 
+  const toggleMapMode = () => {
+    const nextMode: MapMode = mapMode === "3d" ? "2d" : "3d";
+    const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+    mapRef.current?.easeTo({
+      bearing: nextMode === "3d" ? THREE_DIMENSIONAL_VIEW.bearing : 0,
+      duration: reducedMotion ? 0 : 520,
+      pitch: nextMode === "3d" ? THREE_DIMENSIONAL_VIEW.pitch : 0
+    });
+    setMapMode(nextMode);
+  };
+
   return (
-    <section className="map-shell" aria-label="Map of Sydney CBD">
+    <section className="map-shell" aria-label="Map of Sydney CBD" data-map-mode={mapMode}>
       <div className="map-toolbar" aria-label="Map data sources">
         <span><i className="status-dot status-dot--local" aria-hidden="true" /> Embedded PMTiles</span>
         <span>offline local features</span>
         <span><i className="status-dot status-dot--live" aria-hidden="true" /> {segments.length} public segments</span>
         <span><i className="status-dot status-dot--edit" aria-hidden="true" /> local routing</span>
       </div>
+      <button
+        type="button"
+        className="map-mode-toggle"
+        aria-label={`Switch map to ${mapMode === "3d" ? "2D" : "3D"}`}
+        aria-pressed={mapMode === "3d"}
+        onClick={(event) => {
+          event.stopPropagation();
+          toggleMapMode();
+        }}
+      >
+        <span className="map-mode-toggle__value" aria-hidden="true">{mapMode.toUpperCase()}</span>
+        <span className="map-mode-toggle__caption" aria-hidden="true">view</span>
+      </button>
       <div
         ref={containerRef}
         className="map-canvas"
+        data-map-mode={mapMode}
         data-map-ready={mapReady}
         data-map-segments={segments.length}
       />

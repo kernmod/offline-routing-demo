@@ -3,14 +3,15 @@
 Status on 2026-09-01: Route Studio `v1.1` is verified across the shared
 domain, Rust/native, Rust/WASM, Worker/D1, mobile, browser, and live public
 deployment surfaces. The public production URLs now serve the `v1.1` contract
-from the deployed `main` baseline.
+from the deployed `main` baseline. The same public fixture also now supports a
+neutral 2D/3D cartography mode with building extrusion in both clients.
 
 ## System shape
 
 ```text
 public Sydney OSM + DEM
          │
-         ├── fixture builder ──> PMTiles + style + manifest
+         ├── fixture builder ──> PMTiles + neutral 2D/3D style + manifest
          └── graph builder ──> CCHP2 routing.pack + SHA-256
                                       │
                  ┌────────────────────┴────────────────────┐
@@ -56,6 +57,7 @@ This package has no React, DOM, or native dependency.
 - pinned OSM extract metadata;
 - a pinned public DEM crop with source URL, sizes, SHA-256, licence, and attribution;
 - a `CCHP2` graph and `routing.pack` with integer node elevation;
+- a public PMTiles archive with 2D/3D styling support and extruded buildings;
 - a manifest that records every asset and its digest.
 
 `crates/cch-routing-lite` builds and loads the pack, answers `route` and
@@ -94,6 +96,11 @@ editable immediately:
 - use undo/redo and loop toggle;
 - inspect the elevation profile and trim selection;
 - publish a confirmed named snapshot.
+
+Both clients expose a visible 2D/3D toggle. The 3D mode uses public fixture
+data only: MapLibre fill-extrusion layers for buildings, a stylized neutral
+palette, and local PMTiles assets. Terrain is intentionally not activated; the
+elevation profile remains a route metric, not a terrain renderer.
 
 Playwright asserts that these flows work on both desktop and mobile viewport and
 that no `/route` request is sent over the network.

@@ -14,35 +14,37 @@ import { inflateSync } from "node:zlib";
 export const FIXTURE_BBOX = [151.204, -33.873, 151.217, -33.862];
 export const MIN_ZOOM = 13;
 export const MAX_ZOOM = 16;
-export const MAX_FIXTURE_BYTES = 5_000_000;
+export const MAX_FIXTURE_BYTES = 8_500_000;
+
+const ROAD_TAGS = new Set([
+  "access", "bridge", "foot", "highway", "oneway", "surface", "tunnel",
+]);
+const BUILDING_TAGS = new Set([
+  "building", "building:part", "building:levels", "building:min_level", "height", "min_height",
+]);
+const LANDUSE_KEYS = new Set(["amenity", "landuse", "leisure", "natural", "tourism"]);
+const LANDUSE_VALUES = new Set([
+  "campus", "garden", "grass", "greenfield", "park", "pedestrian", "pitch", "plaza",
+  "recreation_ground", "reserve", "retail", "school", "sports_centre", "university",
+]);
 
 export function normalizeOverpass(raw, snapshot) {
-  const nodeIds = new Set(
-    raw.elements
-      .filter((element) => element.type === "way")
-      .flatMap((way) => way.nodes),
-  );
+  if (!raw || !Array.isArray(raw.elements)) throw new TypeError("invalid Overpass response");
+  if (typeof snapshot !== "string" || !/^\d{4}-\d{2}-\d{2}T/.test(snapshot)) {
+    throw new TypeError("invalid Overpass snapshot timestamp");
+  }
+  const ways = raw.elements
+    .filter((element) => element.type === "way")
+    .map(({ id, nodes: wayNodes, tags = {} }) => normalizeWay({ id, nodes: wayNodes, tags }))
+    .filter(Boolean)
+    .sort((a, b) => a.id - b.id);
+  const nodeIds = new Set(ways.flatMap((way) => way.nodes));
   const nodes = raw.elements
     .filter((element) => element.type === "node" && nodeIds.has(element.id))
     .map(({ id, lat, lon }) => ({ id, lat, lon }))
     .sort((a, b) => a.id - b.id);
-  const keptTags = new Set([
-    "access", "bridge", "foot", "highway", "name", "oneway", "surface", "tunnel",
-  ]);
-  const ways = raw.elements
-    .filter((element) => element.type === "way")
-    .map(({ id, nodes: wayNodes, tags = {} }) => ({
-      id,
-      nodes: wayNodes,
-      tags: Object.fromEntries(
-        Object.entries(tags)
-          .filter(([key]) => keptTags.has(key))
-          .sort(([a], [b]) => a.localeCompare(b)),
-      ),
-    }))
-    .sort((a, b) => a.id - b.id);
   return {
-    schema_version: 1,
+    schema_version: 3,
     snapshot,
     bbox: FIXTURE_BBOX,
     attribution: "© OpenStreetMap contributors",
@@ -50,6 +52,84 @@ export function normalizeOverpass(raw, snapshot) {
     nodes,
     ways,
   };
+}
+
+function isClosedWay(nodes) {
+  return Array.isArray(nodes) && nodes.length >= 4 && nodes[0] === nodes[nodes.length - 1];
+}
+
+function keepTags(tags, allowed) {
+  return Object.fromEntries(
+    Object.entries(tags)
+      .filter(([key]) => allowed.has(key))
+      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)),
+  );
+}
+
+function parseMeters(value) {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value !== "string") return null;
+  const normalized = value.trim().toLowerCase().replace(",", ".");
+  const feet = normalized.match(/^(\d+(?:\.\d+)?)\s*(?:ft|feet|')$/);
+  if (feet) return Number(feet[1]) * 0.3048;
+  const meters = normalized.match(/^(\d+(?:\.\d+)?)\s*(?:m|meter|metre|meters|metres)?$/);
+  return meters ? Number(meters[1]) : null;
+}
+
+function parseLevels(value) {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value !== "string") return null;
+  const match = value.trim().replace(",", ".").match(/^(\d+(?:\.\d+)?)$/);
+  return match ? Number(match[1]) : null;
+}
+
+function boundedMeters(value, fallback, { min = 0, max = 160 } = {}) {
+  const next = Number.isFinite(value) ? value : fallback;
+  return Math.max(min, Math.min(max, Math.round(next)));
+}
+
+function deriveRenderHeight(tags) {
+  const explicit = parseMeters(tags.height);
+  const levels = parseLevels(tags["building:levels"]);
+  return boundedMeters(explicit ?? (levels ? levels * 3 : null), 10, { min: 3, max: 160 });
+}
+
+function deriveRenderMinHeight(tags) {
+  const explicit = parseMeters(tags.min_height);
+  const levels = parseLevels(tags["building:min_level"]);
+  const height = deriveRenderHeight(tags);
+  const base = boundedMeters(explicit ?? (levels ? levels * 3 : null), 0, { min: 0, max: 80 });
+  return Math.min(base, height - 1);
+}
+
+function normalizeWay({ id, nodes, tags }) {
+  if (!Number.isInteger(id) || !Array.isArray(nodes)) return null;
+  if (tags.highway) {
+    return { id, kind: "road", nodes, tags: keepTags(tags, ROAD_TAGS) };
+  }
+  if (isClosedWay(nodes) && (tags.building || tags["building:part"])) {
+    return {
+      id,
+      kind: "building",
+      nodes,
+      tags: {
+        ...keepTags(tags, BUILDING_TAGS),
+        render_height: deriveRenderHeight(tags),
+        render_min_height: deriveRenderMinHeight(tags),
+      },
+    };
+  }
+  if (isClosedWay(nodes) && (tags.natural === "water" || tags.water || tags.waterway === "riverbank")) {
+    return { id, kind: "water", nodes, tags: { class: "water" } };
+  }
+  if (isClosedWay(nodes)) {
+    if (tags.landuse) return { id, kind: "landuse", nodes, tags: { class: String(tags.landuse) } };
+    const landuse = Object.entries(tags).find(([key, value]) => (
+      LANDUSE_KEYS.has(key) && LANDUSE_VALUES.has(String(value))
+    ));
+    if (landuse) return { id, kind: "landuse", nodes, tags: { class: String(landuse[1]) } };
+  }
+  return null;
 }
 
 export function sha256(path) {
@@ -324,10 +404,12 @@ function roadClass(highway) {
 }
 
 function encodeValue(value) {
-  return fieldBytes(1, Buffer.from(value));
+  if (typeof value === "string") return fieldBytes(1, Buffer.from(value));
+  if (Number.isInteger(value) && value >= 0) return fieldVarint(4, value);
+  throw new TypeError(`unsupported MVT property value ${String(value)}`);
 }
 
-function encodeFeature(id, classIndex, segments) {
+function encodeLineGeometry(segments) {
   const geometry = [];
   let cursorX = 0;
   let cursorY = 0;
@@ -343,20 +425,152 @@ function encodeFeature(id, classIndex, segments) {
     cursorX = x1;
     cursorY = y1;
   }
+  return Buffer.concat(geometry);
+}
+
+function signedArea(ring) {
+  let area = 0;
+  for (let index = 0; index < ring.length; index += 1) {
+    const current = ring[index];
+    const next = ring[(index + 1) % ring.length];
+    area += current[0] * next[1] - next[0] * current[1];
+  }
+  return area / 2;
+}
+
+function clipPolygonBoundary(points, inside, intersect) {
+  if (points.length === 0) return points;
+  const result = [];
+  let previous = points[points.length - 1];
+  let previousInside = inside(previous);
+  for (const current of points) {
+    const currentInside = inside(current);
+    if (currentInside !== previousInside) result.push(intersect(previous, current));
+    if (currentInside) result.push(current);
+    previous = current;
+    previousInside = currentInside;
+  }
+  return result;
+}
+
+function clipPolygon(points, minimum = -256, maximum = 4352) {
+  const vertical = (boundary) => (from, to) => {
+    const ratio = (boundary - from[0]) / (to[0] - from[0]);
+    return [boundary, from[1] + ratio * (to[1] - from[1])];
+  };
+  const horizontal = (boundary) => (from, to) => {
+    const ratio = (boundary - from[1]) / (to[1] - from[1]);
+    return [from[0] + ratio * (to[0] - from[0]), boundary];
+  };
+  let clipped = points;
+  clipped = clipPolygonBoundary(clipped, ([x]) => x >= minimum, vertical(minimum));
+  clipped = clipPolygonBoundary(clipped, ([x]) => x <= maximum, vertical(maximum));
+  clipped = clipPolygonBoundary(clipped, ([, y]) => y >= minimum, horizontal(minimum));
+  clipped = clipPolygonBoundary(clipped, ([, y]) => y <= maximum, horizontal(maximum));
+  const rounded = clipped.map(([x, y]) => [Math.round(x), Math.round(y)]);
+  const deduplicated = rounded.filter((point, index) => (
+    index === 0 || point[0] !== rounded[index - 1][0] || point[1] !== rounded[index - 1][1]
+  ));
+  if (
+    deduplicated.length > 1 &&
+    deduplicated[0][0] === deduplicated[deduplicated.length - 1][0] &&
+    deduplicated[0][1] === deduplicated[deduplicated.length - 1][1]
+  ) deduplicated.pop();
+  if (deduplicated.length < 3 || signedArea(deduplicated) === 0) return [];
+  // MVT exterior rings are clockwise in screen coordinates (positive y points down).
+  return signedArea(deduplicated) > 0 ? deduplicated : deduplicated.reverse();
+}
+
+function encodePolygonGeometry(ring) {
+  const geometry = [
+    encodeVarint(9),
+    encodeVarint(zigzag(ring[0][0])),
+    encodeVarint(zigzag(ring[0][1])),
+  ];
+  let cursorX = ring[0][0];
+  let cursorY = ring[0][1];
+  geometry.push(encodeVarint(((ring.length - 1) << 3) | 2));
+  for (let index = 1; index < ring.length; index += 1) {
+    geometry.push(encodeVarint(zigzag(ring[index][0] - cursorX)));
+    geometry.push(encodeVarint(zigzag(ring[index][1] - cursorY)));
+    cursorX = ring[index][0];
+    cursorY = ring[index][1];
+  }
+  geometry.push(encodeVarint(15));
+  return Buffer.concat(geometry);
+}
+
+function encodeFeature({ id, type, geometry, tags }) {
   return Buffer.concat([
     fieldVarint(1, id),
-    fieldBytes(2, Buffer.concat([encodeVarint(0), encodeVarint(classIndex)])),
-    fieldVarint(3, 2),
-    fieldBytes(4, Buffer.concat(geometry)),
+    ...(tags.length > 0 ? [fieldBytes(2, Buffer.concat(tags.map(encodeVarint)))] : []),
+    fieldVarint(3, type),
+    fieldBytes(4, geometry),
   ]);
+}
+
+function encodeLayer(name, keys, rawFeatures, extent) {
+  const values = [];
+  const valueIndexes = new Map();
+  const features = rawFeatures.map((feature) => {
+    const tags = [];
+    for (let keyIndex = 0; keyIndex < keys.length; keyIndex += 1) {
+      const value = feature.properties[keys[keyIndex]];
+      if (value === undefined) continue;
+      const identity = `${typeof value}:${String(value)}`;
+      if (!valueIndexes.has(identity)) {
+        valueIndexes.set(identity, values.length);
+        values.push(value);
+      }
+      tags.push(keyIndex, valueIndexes.get(identity));
+    }
+    return encodeFeature({ ...feature, tags });
+  });
+  const layer = Buffer.concat([
+    fieldBytes(1, Buffer.from(name)),
+    ...features.map((feature) => fieldBytes(2, feature)),
+    ...keys.map((key) => fieldBytes(3, Buffer.from(key))),
+    ...values.map((value) => fieldBytes(4, encodeValue(value))),
+    fieldVarint(5, extent),
+    fieldVarint(15, 2),
+  ]);
+  return fieldBytes(3, layer);
 }
 
 export function buildMvtTile(source, tile) {
   const extent = 4096;
   const nodes = new Map(source.nodes.map((node) => [node.id, node]));
-  const classes = ["major", "street", "path"];
-  const features = [];
+  const roadFeatures = [];
+  const polygonFeatures = { buildings: [], water: [], landuse: [] };
   for (const way of source.ways) {
+    const kind = way.kind ?? (way.tags.highway ? "road" : null);
+    if (kind !== "road") {
+      const layerName = kind === "building" ? "buildings" : kind;
+      if (!(layerName in polygonFeatures)) continue;
+      const projected = way.nodes
+        .map((nodeId) => nodes.get(nodeId))
+        .filter(Boolean)
+        .map((node) => [
+          (lonToWorldX(node.lon, tile.z) - tile.x) * extent,
+          (latToWorldY(node.lat, tile.z) - tile.y) * extent,
+        ]);
+      if (
+        projected.length > 1 &&
+        projected[0][0] === projected[projected.length - 1][0] &&
+        projected[0][1] === projected[projected.length - 1][1]
+      ) projected.pop();
+      const ring = clipPolygon(projected);
+      if (ring.length === 0) continue;
+      polygonFeatures[layerName].push({
+        id: way.id,
+        type: 3,
+        geometry: encodePolygonGeometry(ring),
+        properties: layerName === "buildings"
+          ? { render_height: way.tags.render_height, render_min_height: way.tags.render_min_height }
+          : { class: way.tags.class },
+      });
+      continue;
+    }
     const segments = [];
     for (let index = 1; index < way.nodes.length; index += 1) {
       const from = nodes.get(way.nodes[index - 1]);
@@ -372,20 +586,20 @@ export function buildMvtTile(source, tile) {
       }
     }
     if (segments.length > 0) {
-      features.push(
-        encodeFeature(way.id, classes.indexOf(roadClass(way.tags.highway)), segments),
-      );
+      roadFeatures.push({
+        id: way.id,
+        type: 2,
+        geometry: encodeLineGeometry(segments),
+        properties: { class: roadClass(way.tags.highway) },
+      });
     }
   }
-  const layer = Buffer.concat([
-    fieldBytes(1, Buffer.from("roads")),
-    ...features.map((feature) => fieldBytes(2, feature)),
-    fieldBytes(3, Buffer.from("class")),
-    ...classes.map((value) => fieldBytes(4, encodeValue(value))),
-    fieldVarint(5, extent),
-    fieldVarint(15, 2),
+  return Buffer.concat([
+    encodeLayer("landuse", ["class"], polygonFeatures.landuse, extent),
+    encodeLayer("water", ["class"], polygonFeatures.water, extent),
+    encodeLayer("roads", ["class"], roadFeatures, extent),
+    encodeLayer("buildings", ["render_height", "render_min_height"], polygonFeatures.buildings, extent),
   ]);
-  return fieldBytes(3, layer);
 }
 
 function encodeDirectory(entries) {
@@ -437,10 +651,20 @@ export function buildPmtiles(source) {
   const metadata = Buffer.from(
     JSON.stringify({
       attribution: "© OpenStreetMap contributors (ODbL)",
-      description: "Small label-free Sydney CBD walking basemap fixture",
+      description: "Small label-free Sydney CBD multi-layer cartography fixture",
       name: "Sydney CBD offline fixture",
       type: "baselayer",
-      vector_layers: [{ id: "roads", fields: { class: "String" }, minzoom: 13, maxzoom: 16 }],
+      vector_layers: [
+        { id: "roads", fields: { class: "String" }, minzoom: MIN_ZOOM, maxzoom: MAX_ZOOM },
+        {
+          id: "buildings",
+          fields: { render_height: "Number", render_min_height: "Number" },
+          minzoom: MIN_ZOOM,
+          maxzoom: MAX_ZOOM,
+        },
+        { id: "water", fields: { class: "String" }, minzoom: MIN_ZOOM, maxzoom: MAX_ZOOM },
+        { id: "landuse", fields: { class: "String" }, minzoom: MIN_ZOOM, maxzoom: MAX_ZOOM },
+      ],
     }),
   );
   const header = Buffer.alloc(127);
@@ -490,6 +714,29 @@ function buildStyle() {
     layers: [
       { id: "paper", type: "background", paint: { "background-color": "#1a1d1a" } },
       {
+        id: "landuse", type: "fill", source: "offline", "source-layer": "landuse",
+        paint: { "fill-color": "#465044", "fill-opacity": 0.62, "fill-outline-color": "#66725d" },
+      },
+      {
+        id: "water", type: "fill", source: "offline", "source-layer": "water",
+        paint: { "fill-color": "#526d73", "fill-opacity": 0.86, "fill-outline-color": "#789096" },
+      },
+      {
+        id: "building-footprints", type: "fill", source: "offline", "source-layer": "buildings",
+        paint: { "fill-color": "#86735f", "fill-opacity": 0.38, "fill-outline-color": "#aa9274" },
+      },
+      {
+        id: "buildings-3d", type: "fill-extrusion", source: "offline", "source-layer": "buildings",
+        minzoom: 14,
+        paint: {
+          "fill-extrusion-color": "#9b8267",
+          "fill-extrusion-height": ["get", "render_height"],
+          "fill-extrusion-base": ["get", "render_min_height"],
+          "fill-extrusion-opacity": 0.82,
+          "fill-extrusion-vertical-gradient": true,
+        },
+      },
+      {
         id: "paths", type: "line", source: "offline", "source-layer": "roads",
         filter: ["==", ["get", "class"], "path"],
         paint: { "line-color": "#7a8a6b", "line-width": 1.3, "line-opacity": 0.8 },
@@ -511,18 +758,24 @@ function buildStyle() {
 function attributionText(source, demSource) {
   return `# Sydney fixture attribution
 
-The road data in \`source.osm.json\` is © OpenStreetMap contributors and is
+The road and cartographic polygon data in \`source.osm.json\` is © OpenStreetMap contributors and is
 available under the [Open Data Commons Open Database License 1.0](https://opendatacommons.org/licenses/odbl/1-0/).
 
 - Geographic extent: Sydney CBD, Australia (\`${source.bbox.join(", ")}\`)
 - Snapshot: \`${source.snapshot}\`
-- Extract: highway ways and their referenced nodes
+- Extract: highway ways plus closed building, water and selected land-use ways, with their referenced nodes
 - Canonical source: OpenStreetMap, queried through the public Overpass API
 
 The normalized source is checked into the repository. Building the runtime
 assets from that file performs no network request. The basemap intentionally
 contains no labels, so the local glyph template is never requested by the
 style; an empty font range is included to keep all style URLs local.
+
+This bounded fixture deliberately supports closed OSM ways only. Relation-based
+multipolygons and holes are outside its public demo scope; they are neither
+silently flattened nor imported. Building extrusion heights are derived from
+public \`height\`, \`building:levels\`, \`min_height\` and
+\`building:min_level\` tags, then bounded to conservative display values.
 
 ## Elevation
 
@@ -582,6 +835,7 @@ export function buildRoutingGraph(source, dem) {
     adjacency.get(from).add(to);
   };
   for (const way of source.ways) {
+    if (!way.tags.highway || (way.kind && way.kind !== "road")) continue;
     if (
       excludedHighways.has(way.tags.highway) ||
       ["no", "private"].includes(way.tags.access) ||
@@ -689,13 +943,20 @@ export function buildFixture({ root, out, includeExistingRouting = true }) {
   ];
   const manifest = {
     schema_version: 2,
-    id: "sydney-cbd-walking-v2",
+    id: "sydney-cbd-cartography-v3",
     bbox: FIXTURE_BBOX,
     source: {
       file: "source.osm.json", snapshot: source.snapshot,
       attribution: "© OpenStreetMap contributors", license: "ODbL-1.0",
     },
     build: { command: "make fixture", deterministic: true, network_required: false },
+    cartography: {
+      layers: ["roads", "buildings", "water", "landuse"],
+      geometry: "closed OSM ways",
+      excluded_geometry: ["relation multipolygons", "polygon holes"],
+      labels: false,
+      building_heights: "bounded values derived from public OSM tags",
+    },
     routing: {
       status: routingReady ? "ready" : "pending", path: "routing.pack", source: "graph.json",
       builder_contract: "cch-routing-lite build-pack",
@@ -714,7 +975,10 @@ export function buildFixture({ root, out, includeExistingRouting = true }) {
       min_m: Math.min(...graph.nodes.map((node) => node.elevationM)),
       max_m: Math.max(...graph.nodes.map((node) => node.elevationM)),
     },
-    budget: { max_bytes: MAX_FIXTURE_BYTES },
+    budget: {
+      max_bytes: MAX_FIXTURE_BYTES,
+      reason: "Bounded 8.5 MB allowance for a public multi-layer 3D cartography fixture, routing pack and DEM evidence",
+    },
     assets: assetPaths.map((path) => assetRecord(output, path)),
   };
   writeFileSync(join(output, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`);
@@ -821,6 +1085,12 @@ export function verifyFixture(fixtureDir) {
       throw new Error(`PMTiles ${name} outside archive`);
     }
   }
-  JSON.parse(archive.subarray(header.metadataOffset, header.metadataOffset + header.metadataLength).toString("utf8"));
-  return { manifest, header, declaredBytes };
+  const metadata = JSON.parse(
+    archive.subarray(header.metadataOffset, header.metadataOffset + header.metadataLength).toString("utf8"),
+  );
+  const layers = (metadata.vector_layers ?? []).map((layer) => layer.id);
+  if (JSON.stringify([...layers].sort()) !== JSON.stringify(["buildings", "landuse", "roads", "water"])) {
+    throw new Error("PMTiles layer contract drift");
+  }
+  return { manifest, header, declaredBytes, layers };
 }

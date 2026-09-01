@@ -80,11 +80,13 @@ test("Overpass normalization is sorted, minimal, and deterministic", () => {
       { type: "node", id: 3, lat: -33.86, lon: 151.21, tags: { name: "ignored" } },
       { type: "node", id: 1, lat: -33.87, lon: 151.205 },
       { type: "node", id: 2, lat: -33.87, lon: 151.206 },
+      { type: "node", id: 4, lat: -33.8705, lon: 151.206 },
       { type: "way", id: 9, nodes: [2, 1], tags: { name: "Lane", highway: "path", secret: "drop" } },
+      { type: "way", id: 10, nodes: [1, 2, 4, 1], tags: { building: "yes", "building:levels": "7", "addr:housenumber": "drop" } },
     ],
   };
   assert.deepEqual(normalizeOverpass(raw, "2026-08-31T00:00:00Z"), {
-    schema_version: 1,
+    schema_version: 3,
     snapshot: "2026-08-31T00:00:00Z",
     bbox: [151.204, -33.873, 151.217, -33.862],
     attribution: "© OpenStreetMap contributors",
@@ -92,9 +94,48 @@ test("Overpass normalization is sorted, minimal, and deterministic", () => {
     nodes: [
       { id: 1, lat: -33.87, lon: 151.205 },
       { id: 2, lat: -33.87, lon: 151.206 },
+      { id: 4, lat: -33.8705, lon: 151.206 },
     ],
-    ways: [{ id: 9, nodes: [2, 1], tags: { highway: "path", name: "Lane" } }],
+    ways: [
+      { id: 9, kind: "road", nodes: [2, 1], tags: { highway: "path" } },
+      { id: 10, kind: "building", nodes: [1, 2, 4, 1], tags: { building: "yes", "building:levels": "7", render_height: 21, render_min_height: 0 } },
+    ],
   });
+});
+
+test("Overpass normalization bounds public heights and keeps only supported area classes", () => {
+  const nodes = [
+    { type: "node", id: 1, lat: -33.87, lon: 151.205 },
+    { type: "node", id: 2, lat: -33.87, lon: 151.206 },
+    { type: "node", id: 3, lat: -33.869, lon: 151.206 },
+    { type: "node", id: 4, lat: -33.869, lon: 151.205 },
+  ];
+  const source = normalizeOverpass({
+    elements: [
+      ...nodes,
+      {
+        type: "way", id: 12, nodes: [1, 2, 3, 4, 1],
+        tags: { building: "yes", height: "700 ft", min_height: "200 ft", name: "drop" },
+      },
+      { type: "way", id: 13, nodes: [1, 2, 3, 4, 1], tags: { natural: "water", name: "drop" } },
+      { type: "way", id: 14, nodes: [1, 2, 3, 4, 1], tags: { landuse: "industrial" } },
+      { type: "way", id: 15, nodes: [1, 2, 3, 4, 1], tags: { leisure: "park" } },
+      { type: "way", id: 16, nodes: [1, 2, 3], tags: { building: "yes" } },
+    ],
+  }, "2026-09-01T00:00:00Z");
+
+  assert.deepEqual(source.ways.map(({ id, kind, tags }) => ({ id, kind, tags })), [
+    {
+      id: 12,
+      kind: "building",
+      tags: { building: "yes", height: "700 ft", min_height: "200 ft", render_height: 160, render_min_height: 61 },
+    },
+    { id: 13, kind: "water", tags: { class: "water" } },
+    { id: 14, kind: "landuse", tags: { class: "industrial" } },
+    { id: 15, kind: "landuse", tags: { class: "park" } },
+  ]);
+  assert.throws(() => normalizeOverpass({}, "2026-09-01T00:00:00Z"), /Overpass response/);
+  assert.throws(() => normalizeOverpass({ elements: [] }, "latest"), /timestamp/);
 });
 
 test("tile ids follow the PMTiles Hilbert ordering", () => {
@@ -236,6 +277,12 @@ test("walking graph filters forbidden ways and keeps its largest component", () 
       { id: 2, nodes: [20, 21], tags: { highway: "residential" } },
       { id: 3, nodes: [3, 2], tags: { highway: "motorway" } },
       { id: 4, nodes: [4, 5], tags: { highway: "path", access: "private" } },
+      {
+        id: 5,
+        kind: "building",
+        nodes: [1, 2, 5, 4, 1],
+        tags: { render_height: 12, render_min_height: 0 },
+      },
     ],
   };
   const graph = buildRoutingGraph(source, { sample: ({ lat, lng }) => Math.round((lat + lng) * 10) });
@@ -245,18 +292,30 @@ test("walking graph filters forbidden ways and keeps its largest component", () 
   assert.ok(graph.arcs.every((arc) => arc.weight > 0));
 });
 
-test("MVT builder emits a roads layer protobuf", () => {
+test("MVT builder emits road, polygon and building extrusion layers", () => {
   const source = {
     nodes: [
       { id: 1, lat: -33.8675, lon: 151.21 },
       { id: 2, lat: -33.8676, lon: 151.211 },
+      { id: 3, lat: -33.8680, lon: 151.211 },
+      { id: 4, lat: -33.8680, lon: 151.210 },
     ],
-    ways: [{ id: 42, nodes: [1, 2], tags: { highway: "residential" } }],
+    ways: [
+      { id: 42, kind: "road", nodes: [1, 2], tags: { highway: "residential" } },
+      { id: 43, kind: "building", nodes: [1, 2, 3, 4, 1], tags: { render_height: 18, render_min_height: 3 } },
+      { id: 44, kind: "landuse", nodes: [1, 2, 3, 4, 1], tags: { class: "park" } },
+      { id: 45, kind: "water", nodes: [1, 2, 3, 4, 1], tags: { class: "water" } },
+    ],
   };
   const tile = buildMvtTile(source, { z: 16, x: 60295, y: 39327 });
   assert.ok(tile.length > 20);
   assert.ok(tile.includes(Buffer.from("roads")));
   assert.ok(tile.includes(Buffer.from("street")));
+  assert.ok(tile.includes(Buffer.from("buildings")));
+  assert.ok(tile.includes(Buffer.from("render_height")));
+  assert.ok(tile.includes(Buffer.from("render_min_height")));
+  assert.ok(tile.includes(Buffer.from("landuse")));
+  assert.ok(tile.includes(Buffer.from("water")));
 });
 
 test("PMTiles header parser rejects malformed archives", () => {
@@ -268,9 +327,10 @@ test("PMTiles header parser rejects malformed archives", () => {
 
 test("fixture verifier returns independently parsed archive facts", () => {
   const result = verifyFixture(fixture);
-  assert.equal(result.manifest.id, "sydney-cbd-walking-v2");
+  assert.equal(result.manifest.id, "sydney-cbd-cartography-v3");
   assert.equal(result.header.addressedTiles, 26);
-  assert.ok(result.declaredBytes < 5_000_000);
+  assert.ok(result.declaredBytes < 8_500_000);
+  assert.deepEqual(result.layers.sort(), ["buildings", "landuse", "roads", "water"]);
 });
 
 test("file inventory recurses into the local glyph directory", () => {
@@ -290,7 +350,7 @@ test("fixture verifier rejects budget and PMTiles structural drift", () => {
     writeFileSync(manifestPath, `${JSON.stringify(manifest)}\n`);
     assert.throws(() => verifyFixture(candidate), /budget/);
 
-    manifest.budget.max_bytes = 5_000_000;
+    manifest.budget.max_bytes = 8_500_000;
     const archivePath = join(candidate, "map.pmtiles");
     const archive = Buffer.from(readFileSync(archivePath));
     archive[99] = 2;

@@ -61,6 +61,8 @@ test("private drafts persist only in the application document sandbox", () => {
 test("offline assets and styles contain no remote URL or CDN fallback", () => {
   const manifest = read("assets/fixture-manifest.json");
   const style = read("assets/style.json");
+  const mobileStyle = JSON.parse(style);
+  const fixtureStyle = JSON.parse(read("../../fixtures/sydney/style.json"));
   const metro = read("metro.config.cjs");
   assert.match(manifest, /map\.pmtiles/);
   assert.match(manifest, /routing\.pack/);
@@ -72,10 +74,40 @@ test("offline assets and styles contain no remote URL or CDN fallback", () => {
   assert.match(manifest, /"schema_version": 2/);
   assert.match(manifest, /"pack_schema": "CCHP2"/);
   assert.match(manifest, /"elevation"/);
+  assert.match(manifest, /"id": "sydney-cbd-cartography-v3"/);
+  assert.match(style, /buildings-3d/);
+  assert.match(style, /fill-extrusion/);
+  assert.match(style, /render_height/);
+  assert.match(style, /render_min_height/);
+  const expectedMobileStyle = structuredClone(fixtureStyle);
+  expectedMobileStyle.sources.offline = {
+    ...fixtureStyle.sources.offline,
+    tiles: ["http://127.0.0.1:$PORT/tiles/{z}/{x}/{y}.pbf"],
+    minzoom: fixtureStyle.sources.offline.minzoom ?? 13,
+    maxzoom: fixtureStyle.sources.offline.maxzoom ?? 16
+  };
+  delete expectedMobileStyle.sources.offline.url;
+  assert.deepEqual(mobileStyle, expectedMobileStyle);
   const preparation = read("scripts/prepareAssets.mjs");
-  assert.match(preparation, /fixtures\/sydney\/manifest\.json/);
-  assert.match(preparation, /fixtures\/sydney\/routing\.pack/);
-  assert.match(preparation, /fixtures\/sydney\/map\.pmtiles/);
+  assert.match(preparation, /resolve\(root, "fixtures\/sydney"\)/);
+  assert.match(preparation, /resolve\(fixture, "manifest\.json"\)/);
+  assert.match(preparation, /resolve\(fixture, "routing\.pack"\)/);
+  assert.match(preparation, /resolve\(fixture, "map\.pmtiles"\)/);
+  assert.match(preparation, /readFile\(resolve\(fixture, "style\.json"\)/);
+  assert.match(preparation, /publicStyle\.sources\.offline/);
+  assert.match(preparation, /delete publicStyle\.sources\.offline\.url/);
+  assert.match(preparation, /127\.0\.0\.1:\$PORT/);
+  assert.doesNotMatch(preparation, /copyFile\(resolve\(assets, "style\.json"/);
+});
+
+test("mobile map exposes a local 2D/3D cartography mode", () => {
+  const source = read("App.tsx");
+  assert.match(source, /mapMode/);
+  assert.match(source, /setMapMode/);
+  assert.match(source, /pitch:\s*mapMode === "3d"/);
+  assert.match(source, /bearing:\s*mapMode === "3d"/);
+  assert.match(source, /Switch map to 2D|Switch map to 3D/);
+  assert.match(source, /androidView="texture"/);
 });
 
 test("network capability is quarantined behind the explicit publish and refresh actions", () => {

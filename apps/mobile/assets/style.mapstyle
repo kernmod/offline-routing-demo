@@ -1,13 +1,135 @@
 {
   "version": 8,
-  "name": "Sydney offline technical map",
+  "name": "Sydney field notes",
+  "glyphs": "./glyphs/{fontstack}/{range}.pbf",
   "sources": {
-    "offline": { "type": "vector", "tiles": ["http://127.0.0.1:$PORT/tiles/{z}/{x}/{y}.pbf"], "minzoom": 0, "maxzoom": 15, "attribution": "© OpenStreetMap contributors" }
+    "offline": {
+      "type": "vector",
+      "attribution": "© OpenStreetMap contributors",
+      "tiles": [
+        "http://127.0.0.1:$PORT/tiles/{z}/{x}/{y}.pbf"
+      ],
+      "minzoom": 13,
+      "maxzoom": 16
+    }
   },
   "layers": [
-    { "id": "background", "type": "background", "paint": { "background-color": "#07131d" } },
-    { "id": "paths", "type": "line", "source": "offline", "source-layer": "roads", "filter": ["==", ["get", "class"], "path"], "paint": { "line-color": "#2b6270", "line-width": 1.25 } },
-    { "id": "streets", "type": "line", "source": "offline", "source-layer": "roads", "filter": ["==", ["get", "class"], "street"], "paint": { "line-color": "#dce5e3", "line-width": 1.7 } },
-    { "id": "major", "type": "line", "source": "offline", "source-layer": "roads", "filter": ["==", ["get", "class"], "major"], "paint": { "line-color": "#d8a340", "line-width": 2.7 } }
+    {
+      "id": "paper",
+      "type": "background",
+      "paint": {
+        "background-color": "#1a1d1a"
+      }
+    },
+    {
+      "id": "landuse",
+      "type": "fill",
+      "source": "offline",
+      "source-layer": "landuse",
+      "paint": {
+        "fill-color": "#465044",
+        "fill-opacity": 0.62,
+        "fill-outline-color": "#66725d"
+      }
+    },
+    {
+      "id": "water",
+      "type": "fill",
+      "source": "offline",
+      "source-layer": "water",
+      "paint": {
+        "fill-color": "#526d73",
+        "fill-opacity": 0.86,
+        "fill-outline-color": "#789096"
+      }
+    },
+    {
+      "id": "building-footprints",
+      "type": "fill",
+      "source": "offline",
+      "source-layer": "buildings",
+      "paint": {
+        "fill-color": "#86735f",
+        "fill-opacity": 0.38,
+        "fill-outline-color": "#aa9274"
+      }
+    },
+    {
+      "id": "buildings-3d",
+      "type": "fill-extrusion",
+      "source": "offline",
+      "source-layer": "buildings",
+      "minzoom": 14,
+      "paint": {
+        "fill-extrusion-color": "#9b8267",
+        "fill-extrusion-height": [
+          "get",
+          "render_height"
+        ],
+        "fill-extrusion-base": [
+          "get",
+          "render_min_height"
+        ],
+        "fill-extrusion-opacity": 0.82,
+        "fill-extrusion-vertical-gradient": true
+      }
+    },
+    {
+      "id": "paths",
+      "type": "line",
+      "source": "offline",
+      "source-layer": "roads",
+      "filter": [
+        "==",
+        [
+          "get",
+          "class"
+        ],
+        "path"
+      ],
+      "paint": {
+        "line-color": "#7a8a6b",
+        "line-width": 1.3,
+        "line-opacity": 0.8
+      }
+    },
+    {
+      "id": "streets",
+      "type": "line",
+      "source": "offline",
+      "source-layer": "roads",
+      "filter": [
+        "==",
+        [
+          "get",
+          "class"
+        ],
+        "street"
+      ],
+      "paint": {
+        "line-color": "#e8e2d3",
+        "line-width": 2,
+        "line-opacity": 0.82
+      }
+    },
+    {
+      "id": "major-roads",
+      "type": "line",
+      "source": "offline",
+      "source-layer": "roads",
+      "filter": [
+        "==",
+        [
+          "get",
+          "class"
+        ],
+        "major"
+      ],
+      "paint": {
+        "line-color": "#c89b6b",
+        "line-width": 2.8,
+        "line-opacity": 0.9
+      }
+    }
   ]
 }

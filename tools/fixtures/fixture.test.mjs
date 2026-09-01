@@ -26,7 +26,7 @@ function listFiles(directory, prefix = "") {
 test("manifest describes a bounded, attributed Sydney fixture", () => {
   const manifest = loadManifest();
   assert.equal(manifest.schema_version, 2);
-  assert.equal(manifest.id, "sydney-cbd-walking-v2");
+  assert.equal(manifest.id, "sydney-cbd-cartography-v3");
   assert.deepEqual(manifest.bbox, [151.204, -33.873, 151.217, -33.862]);
   assert.match(manifest.source.license, /ODbL-1\.0/);
   assert.match(manifest.source.attribution, /OpenStreetMap contributors/);
@@ -62,7 +62,22 @@ test("fixture stays below the public repository asset budget", () => {
     .filter((path) => path !== "manifest.json")
     .reduce((sum, path) => sum + statSync(join(fixtureDir, path)).size, 0);
   assert.ok(actualBytes <= manifest.budget.max_bytes);
-  assert.ok(actualBytes <= 5_000_000, `${actualBytes} exceeds the 5 MB hard limit`);
+  assert.ok(actualBytes <= 8_500_000, `${actualBytes} exceeds the 3D fixture budget`);
+  assert.match(manifest.budget.reason, /3D|multi-layer|cartography/i);
+});
+
+test("normalized source includes public cartographic polygons without private layers", () => {
+  const source = JSON.parse(readFileSync(join(fixtureDir, "source.osm.json"), "utf8"));
+  assert.equal(source.schema_version, 3);
+  assert.ok(source.nodes.length > 9_000, "roads plus polygons should require more nodes than the routing-only source");
+  assert.ok(source.ways.some((way) => way.kind === "building"), "fixture must include building footprints");
+  assert.ok(source.ways.some((way) => way.kind === "water"), "fixture must include water polygons");
+  assert.ok(source.ways.some((way) => way.kind === "landuse"), "fixture must include landuse polygons");
+  for (const way of source.ways) {
+    assert.ok(["road", "building", "water", "landuse"].includes(way.kind), `unexpected public kind ${way.kind}`);
+    assert.equal(way.tags.name, undefined, "label text must not enter the public fixture");
+    assert.doesNotMatch(JSON.stringify(way.tags), /syntropy|runchain|pledge|oracle|segmentrace|rcmap/i);
+  }
 });
 
 test("PMTiles archive is v3 MVT and covers the declared bbox", () => {
@@ -83,6 +98,21 @@ test("PMTiles archive is v3 MVT and covers the declared bbox", () => {
   );
   assert.ok(bytes.readBigUInt64LE(72) > 0n, "archive must address tiles");
   assert.ok(bytes.readBigUInt64LE(88) > 0n, "archive must contain tile payloads");
+});
+
+test("PMTiles metadata advertises the full public basemap layer contract", () => {
+  const bytes = readFileSync(join(fixtureDir, "map.pmtiles"));
+  const header = {
+    metadataOffset: Number(bytes.readBigUInt64LE(24)),
+    metadataLength: Number(bytes.readBigUInt64LE(32)),
+  };
+  const metadata = JSON.parse(
+    bytes.subarray(header.metadataOffset, header.metadataOffset + header.metadataLength).toString("utf8")
+  );
+  const layers = Object.fromEntries(metadata.vector_layers.map((layer) => [layer.id, layer]));
+  assert.deepEqual(Object.keys(layers).sort(), ["buildings", "landuse", "roads", "water"]);
+  assert.deepEqual(layers.buildings.fields, { render_height: "Number", render_min_height: "Number" });
+  assert.deepEqual(layers.roads.fields, { class: "String" });
 });
 
 test("routing graph matches the public deterministic builder contract", () => {
@@ -117,6 +147,13 @@ test("style has no remote URL and uses the embedded PMTiles archive", () => {
   assert.equal(style.sources.offline.url, "pmtiles://map.pmtiles");
   assert.equal(style.glyphs, "./glyphs/{fontstack}/{range}.pbf");
   assert.ok(style.layers.some((layer) => layer["source-layer"] === "roads"));
+  assert.ok(style.layers.some((layer) => layer["source-layer"] === "water" && layer.type === "fill"));
+  assert.ok(style.layers.some((layer) => layer["source-layer"] === "landuse" && layer.type === "fill"));
+  const extrusion = style.layers.find((layer) => layer.id === "buildings-3d");
+  assert.equal(extrusion?.type, "fill-extrusion");
+  assert.equal(extrusion?.["source-layer"], "buildings");
+  assert.match(JSON.stringify(extrusion.paint), /render_height/);
+  assert.match(JSON.stringify(extrusion.paint), /render_min_height/);
 });
 
 test("licence and provenance files are explicit", () => {

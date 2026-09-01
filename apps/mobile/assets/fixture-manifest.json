@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "id": "sydney-cbd-walking-v2",
+  "id": "sydney-cbd-cartography-v3",
   "bbox": [
     151.204,
     -33.873,
@@ -9,7 +9,7 @@
   ],
   "source": {
     "file": "source.osm.json",
-    "snapshot": "2026-08-31T07:49:41Z",
+    "snapshot": "2026-09-01T03:49:29Z",
     "attribution": "© OpenStreetMap contributors",
     "license": "ODbL-1.0"
   },
@@ -17,6 +17,21 @@
     "command": "make fixture",
     "deterministic": true,
     "network_required": false
+  },
+  "cartography": {
+    "layers": [
+      "roads",
+      "buildings",
+      "water",
+      "landuse"
+    ],
+    "geometry": "closed OSM ways",
+    "excluded_geometry": [
+      "relation multipolygons",
+      "polygon holes"
+    ],
+    "labels": false,
+    "building_heights": "bounded values derived from public OSM tags"
   },
   "routing": {
     "status": "ready",
@@ -39,13 +54,14 @@
     "max_m": 112
   },
   "budget": {
-    "max_bytes": 5000000
+    "max_bytes": 8500000,
+    "reason": "Bounded 8.5 MB allowance for a public multi-layer 3D cartography fixture, routing pack and DEM evidence"
   },
   "assets": [
     {
       "path": "source.osm.json",
-      "bytes": 1545438,
-      "sha256": "40d41f7358682648c100ec341b4d96559c51d73a12dfb5e7ccf684e2b249ba72"
+      "bytes": 3009744,
+      "sha256": "2ac27e55d7e159087c5538758e75ef86cf5a84c8c40e25b3e3a5a1fde0499271"
     },
     {
       "path": "graph.json",
@@ -54,13 +70,13 @@
     },
     {
       "path": "map.pmtiles",
-      "bytes": 680630,
-      "sha256": "706ff6ef92465001b8e9479468ce9de7c3fa1aadcea0f5a1697ad403de938562"
+      "bytes": 1005723,
+      "sha256": "6afb5d80326384db3d74ad5c17cfba82e1fce7a37b87c6376f3be539dcb33899"
     },
     {
       "path": "style.json",
-      "bytes": 1427,
-      "sha256": "084f1c5afb20fcf46631f9b47b2d64e767494c944be999764d2a350dd4039fdc"
+      "bytes": 2668,
+      "sha256": "937bd1bc4eee47141907942727c774b3fd75c4e03708ccd3a02d984d6baaa47c"
     },
     {
       "path": "glyphs/Offline Sans/0-255.pbf",
@@ -69,8 +85,8 @@
     },
     {
       "path": "ATTRIBUTION.md",
-      "bytes": 1946,
-      "sha256": "a326b2e2fcf4c51e8a3fe4fe13431319ca65ed342867fd526dca8de897c8acf6"
+      "bytes": 2387,
+      "sha256": "aa295b6a171ce23bd74a9060261c1a80b515f3322b30d7688a8e869c28415c32"
     },
     {
       "path": "dem/source.json",

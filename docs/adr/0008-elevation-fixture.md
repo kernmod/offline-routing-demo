@@ -28,8 +28,8 @@ survey-grade claims.
 ## Consequences
 
 - Normal builds and tests need no network and reproduce byte-for-byte.
-- The source snapshot adds roughly half a megabyte but remains within the
-  fixture's five-megabyte budget.
+- The source snapshot adds roughly half a megabyte and, together with the
+  multi-layer cartography fixture, remains within the explicit 8.5 MB budget.
 - Attribution and provenance travel with the fixture.
 - A refresh is explicit: update the provenance lock, fetch the pinned tiles,
   rebuild, and review resulting checksums and profile changes.

@@ -4,13 +4,14 @@ This repository is a public Route Studio built to show end-to-end engineering
 without exposing product-specific logic. It packages one reproducible Sydney
 fixture, one Rust CCH routing engine, one shared editing state machine, an
 offline-first Android client, an install-free web client, and a bounded
-publish/read API.
+publish/read API. The public cartography includes a neutral 3D/stylized map
+based on regenerated public fixture bytes, not on any private map artifact.
 
 The recruiter flow is simple:
 
 1. open the web viewer or install the APK;
 2. create a route with start, finish, and via points;
-3. inspect the local route, elevation profile, and trim selection;
+3. inspect the local route, elevation profile, trim selection, and 2D/3D map mode;
 4. confirm publication of a named snapshot;
 5. read the same published segment back through the live API.
 
@@ -27,6 +28,7 @@ and no business vocabulary or artifacts from the product repo.
 ## What this demonstrates
 
 - deterministic fixture production from pinned public OpenStreetMap and DEM inputs;
+- a regenerated public PMTiles map with 3D building extrusion and a neutral style;
 - a real Rust CCH engine with preprocessing, shortcut unpacking, and multipoint routing;
 - the same router compiled to Nitro/native on Android and to WASM in the browser;
 - one shared `packages/route-studio` domain for multipoint editing, invalidated-leg
@@ -41,7 +43,7 @@ and no business vocabulary or artifacts from the product repo.
 ```text
 public Sydney OSM + DEM
          │
-         ├── reproducible builders ──> PMTiles + style + manifest
+         ├── reproducible builders ──> PMTiles + neutral 2D/3D style + manifest
          └── graph builder ──> CCHP2 routing.pack + SHA-256
                                       │
                  ┌────────────────────┴────────────────────┐
@@ -65,7 +67,7 @@ graph fallback.
 
 | Path | Responsibility |
 | --- | --- |
-| `fixtures/sydney` | public source manifests, DEM crop, attribution, expected outputs |
+| `fixtures/sydney` | public source manifests, DEM crop, attribution, expected outputs, regenerated 2D/3D PMTiles |
 | `crates/cch-routing-lite` | CCH pack build/load/query, `routeMany`, elevation-aware unpack |
 | `crates/cch-routing-lite-wasm` | browser WASM boundary for the same pack |
 | `crates/cch-routing-lite-ffi` | ownership-safe C ABI |
@@ -129,7 +131,8 @@ pnpm --filter @offline-routing/mobile build
 ```
 
 The browser viewer uses the same `routing.pack` bytes as mobile. The E2E suite
-fails if a `/route` request appears on the network.
+fails if a `/route` request appears on the network. The map starts in 3D and
+can be switched to 2D without breaking route overlays.
 
 ### Android release and device gate
 
@@ -143,14 +146,13 @@ ANDROID_SERIAL=localhost:5556 \
 ```
 
 The build generates a demo keystore under `$HOME` only. No signing material is
-committed. The published `v0.2.0` asset has SHA-256
-`ad121007ab699974609103faf5ec3fd37192b9347da464cb5ec8c8eec3f9661f`;
-its airplane-mode device gate is recorded in
-[`docs/evidence/2026-09-01T01-53-00Z-release-device.txt`](docs/evidence/2026-09-01T01-53-00Z-release-device.txt),
-with the three-control-point loop and undo/redo replay in
+committed. The currently published public release remains `v0.2.0`, with
+SHA-256 `ad121007ab699974609103faf5ec3fd37192b9347da464cb5ec8c8eec3f9661f`.
+The local cartography-3D refresh is additionally smoke-tested in airplane mode
+and recorded in
+[`docs/evidence/2026-09-01T03-59-40Z-release-device.txt`](docs/evidence/2026-09-01T03-59-40Z-release-device.txt).
+The earlier three-control-point loop and undo/redo replay remains documented in
 [`docs/evidence/2026-09-01T01-51-18Z-release-multipoint-airplane.txt`](docs/evidence/2026-09-01T01-51-18Z-release-multipoint-airplane.txt).
-The adjacent checksum asset uses the APK basename, so `sha256sum -c` works
-after downloading both files into any directory.
 
 ### Benchmarks
 

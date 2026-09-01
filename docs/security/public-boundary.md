@@ -7,12 +7,14 @@ Public content may include:
 - generic routing code driven by public fixtures
 - public documentation about the offline and online split
 - reproducibility checks, licenses, and attribution
+- a neutral 2D/3D map style built from regenerated public assets
 
 Forbidden content includes:
 
 - any private remote or internal endpoint
 - any committed secret, signing material, or binary release artifact
 - any product-only symbol, asset, or infrastructure reference
+- any private map artifact, private tile source, or product-specific styling cue
 
 Audit tooling enforces exact path allowlists with mandatory reasons and checks:
 

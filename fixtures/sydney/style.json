@@ -18,6 +18,59 @@
       }
     },
     {
+      "id": "landuse",
+      "type": "fill",
+      "source": "offline",
+      "source-layer": "landuse",
+      "paint": {
+        "fill-color": "#465044",
+        "fill-opacity": 0.62,
+        "fill-outline-color": "#66725d"
+      }
+    },
+    {
+      "id": "water",
+      "type": "fill",
+      "source": "offline",
+      "source-layer": "water",
+      "paint": {
+        "fill-color": "#526d73",
+        "fill-opacity": 0.86,
+        "fill-outline-color": "#789096"
+      }
+    },
+    {
+      "id": "building-footprints",
+      "type": "fill",
+      "source": "offline",
+      "source-layer": "buildings",
+      "paint": {
+        "fill-color": "#86735f",
+        "fill-opacity": 0.38,
+        "fill-outline-color": "#aa9274"
+      }
+    },
+    {
+      "id": "buildings-3d",
+      "type": "fill-extrusion",
+      "source": "offline",
+      "source-layer": "buildings",
+      "minzoom": 14,
+      "paint": {
+        "fill-extrusion-color": "#9b8267",
+        "fill-extrusion-height": [
+          "get",
+          "render_height"
+        ],
+        "fill-extrusion-base": [
+          "get",
+          "render_min_height"
+        ],
+        "fill-extrusion-opacity": 0.82,
+        "fill-extrusion-vertical-gradient": true
+      }
+    },
+    {
       "id": "paths",
       "type": "line",
       "source": "offline",

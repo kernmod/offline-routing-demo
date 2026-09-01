@@ -3,7 +3,9 @@
 An install-free route editor and public segment viewer for the Sydney fixture.
 It is deliberately a working map first, not a landing page: MapLibre GL JS opens
 the checked-in PMTiles, the same Rust routing engine used by the mobile demo runs
-as WebAssembly, and the side rail reads and publishes public segment rows.
+as WebAssembly, and the side rail reads and publishes public segment rows. The
+viewer now starts in 3D with public building extrusion and can be switched back
+to 2D without changing routing behavior.
 
 ## Product flow
 
@@ -59,7 +61,8 @@ The map does not download a hosted basemap, token, glyph service, routing
 service, or analytics script. The only live operations are bounded public reads
 and an explicit publication. The API base URL defaults to the viewer origin;
 set `VITE_API_BASE_URL` at build time when the Worker is on another origin.
-Runtime query parameters cannot change the API origin.
+Runtime query parameters cannot change the API origin. The map style is
+regenerated from public fixture bytes and is intentionally neutral.
 
 Publication sends exactly `{name, geometry, controlPoints}` to
 `POST /v2/segments` with a UUIDv4 `idempotency-key`. The shared lifecycle is
@@ -98,7 +101,7 @@ pnpm --filter @offline-routing/viewer test:e2e
 The unit/component suite enforces at least 85% lines/functions and 80% branches.
 It covers draft history, incremental leg invalidation, loop closure, trim and
 profile synchronization, lifecycle transitions, exact API requests, failures,
-and MapLibre click/drag behavior.
+MapLibre click/drag behavior, and the 2D/3D toggle contract.
 
 The real adapter integration test initializes the generated WebAssembly module
 with `fixtures/sydney/routing.pack`, verifies its pinned SHA-256, routes a native
@@ -108,7 +111,7 @@ that routing reads only the static pack and never requests `/route`.
 The Playwright suite runs Chromium at desktop and Pixel 5 viewports. It covers
 real MapLibre/PMTiles rendering, multipoint WASM routing, loop and trim controls,
 the v2 publication round trip, API-down resilience, accessible mobile targets,
-sub-path assets, and visual snapshots.
+the 3D extrusion view, the 2D/3D toggle, sub-path assets, and visual snapshots.
 
 ## Static deployment
 

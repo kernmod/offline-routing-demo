@@ -13,10 +13,10 @@ verification is closed on the deployed `main` baseline.
   longer mention private map/game chunk formats.
 - gitleaks `v8.28.0` reports no leak on the publication file set or reachable
   public Git history; the scan is repeated before each publication commit.
-- `docs/evidence/2026-09-01T01-53-00Z-release-device.txt` records the published
-  `v0.2.0` APK gate on `redroid14_x86_64` in airplane mode; its digest matches
-  the GitHub Release asset. The release checksum contains only the APK basename
-  and verifies from a fresh download directory.
+- `docs/evidence/2026-09-01T03-59-40Z-release-device.txt` records the current
+  cartography branch APK gate on `redroid14_x86_64` in airplane mode, after the
+  public multi-layer PMTiles/style refresh. The evidence stores only the APK
+  digest, not a builder-local path.
 - `docs/evidence/2026-09-01T01-51-18Z-release-multipoint-airplane.txt` records
   three control points, local loop recalculation, undo/redo, and zero network
   attempts against that same published APK digest.
@@ -38,6 +38,9 @@ verification is closed on the deployed `main` baseline.
   signing material, environment files, native binaries in source paths, and
   application/database artifacts.
 - The only committed fixture is the public Sydney pack and its attributed sources.
+- The public cartography ADR (`docs/adr/0009-3d-cartography.md`) records the
+  neutral 2D/3D style contract and explicitly excludes private tiles, terrain
+  endpoints, and product-specific styling.
 - Android build/cache directories are ignored, and `.kotlin` artifacts are also
   rejected if they ever enter the tree or reachable history. The packaging path
   removes repo-local `.cxx`, demo keystore, sourcemap, dex, and Rust JNI

@@ -1,0 +1,8 @@
+device=redroid14_x86_64
+android=14
+abi=x86_64
+airplane_mode=1
+startup=pass
+back=pass
+route=local_native
+apk_sha256=d4a4e6b1f10f74c0a63f614e1c5d57400e9b7037c9ab6b4bfdb443d2e36d6b1a

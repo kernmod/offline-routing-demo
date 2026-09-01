@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Linking, type NativeSyntheticEvent, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Linking, type NativeSyntheticEvent, Pressable, StyleSheet, Text, View } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { Camera, GeoJSONSource, Layer, Map as MapView, type PressEvent } from "@maplibre/maplibre-react-native";
 import type { RouteStudioDraft } from "@offline-routing/route-studio";
@@ -65,6 +65,7 @@ type Controller = {
 };
 
 const sydneyCenter = [151.2105, -33.8675] as [number, number];
+const sydneyInitialView = { center: sydneyCenter, zoom: 14, pitch: 48, bearing: -18 };
 const emptyMetrics: Metrics = { pointCount: 0, distanceM: 0, ascentM: 0, descentM: 0 };
 
 export default function App() {
@@ -75,11 +76,16 @@ export default function App() {
   const [feedback, setFeedback] = useState("Preparing the embedded map and route pack.");
   const [busy, setBusy] = useState(true);
   const [profileMode, setProfileMode] = useState<ProfileMode>("inspect");
+  const [mapMode, setMapMode] = useState<"3d" | "2d">("3d");
 
   const routeFeature = useMemo(() => lineFeature(studio?.route?.polyline ?? []), [studio?.route?.polyline]);
   const selectedFeature = useMemo(() => lineFeature(studio?.selectedGeometry ?? []), [studio?.selectedGeometry]);
   const controlFeature = useMemo(() => pointFeature((studio?.draft.controlPoints ?? []) as ElevationPoint[], "control"), [studio?.draft.controlPoints]);
   const cursorFeature = useMemo(() => pointFeature(studio?.profileCursor ? [studio.profileCursor] : [], "cursor"), [studio?.profileCursor]);
+  const mapCamera = useMemo(() => ({
+    pitch: mapMode === "3d" ? 48 : 0,
+    bearing: mapMode === "3d" ? -18 : 0
+  }), [mapMode]);
 
   const run = async (operation: () => Promise<StudioState>) => {
     setBusy(true);
@@ -232,6 +238,7 @@ export default function App() {
       {styleUrl ? (
         <View style={styles.mapFrame}>
           <MapView
+            androidView="texture"
             style={styles.map}
             mapStyle={styleUrl}
             onPress={onMapPress}
@@ -239,7 +246,13 @@ export default function App() {
               console.log(`OfflineRoutingMapReady ${JSON.stringify({ styleUrl, networkAttempts: networkAttemptCount() })}`);
             }}
           >
-            <Camera initialViewState={{ center: sydneyCenter, zoom: 14 }} />
+            <Camera
+              initialViewState={sydneyInitialView}
+              pitch={mapCamera.pitch}
+              bearing={mapCamera.bearing}
+              duration={420}
+              easing="ease"
+            />
             <GeoJSONSource id="route-source" data={routeFeature as never}>
               <Layer
                 id="route-line"
@@ -271,6 +284,21 @@ export default function App() {
               />
             </GeoJSONSource>
           </MapView>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={mapMode === "3d" ? "Switch map to 2D" : "Switch map to 3D"}
+            accessibilityHint="Changes the camera angle without using the network."
+            hitSlop={8}
+            onPress={() => setMapMode((current) => current === "3d" ? "2d" : "3d")}
+            style={styles.mapModeButton}
+          >
+            {({ pressed }) => (
+              <View style={[styles.mapModeButtonFace, pressed && styles.mapModeButtonPressed]}>
+                <Text style={styles.mapModeEyebrow}>VIEW</Text>
+                <Text style={styles.mapModeValue}>{mapMode.toUpperCase()}</Text>
+              </View>
+            )}
+          </Pressable>
           {busy && (
             <View style={styles.mapBusy}>
               <ActivityIndicator color="#d2a16f" />
@@ -366,6 +394,23 @@ const styles = StyleSheet.create({
   localText: { color: "#a5c294", fontSize: 9, fontWeight: "700" },
   mapFrame: { height: "36%", minHeight: 240, borderBottomWidth: 1, borderColor: "#364039" },
   map: { flex: 1 },
+  mapModeButton: { position: "absolute", top: 10, left: 10, zIndex: 2 },
+  mapModeButtonFace: {
+    minWidth: 52,
+    minHeight: 42,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(232,226,211,0.26)",
+    borderRadius: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    backgroundColor: "rgba(26,29,26,0.92)",
+    elevation: 4
+  },
+  mapModeButtonPressed: { borderColor: "#c89b6b", backgroundColor: "rgba(42,38,31,0.96)" },
+  mapModeEyebrow: { color: "#9ab88a", fontSize: 7, fontWeight: "800", letterSpacing: 1.4 },
+  mapModeValue: { color: "#e8e2d3", fontSize: 14, fontWeight: "900", letterSpacing: 0.8, marginTop: 1 },
   loading: { height: "36%", minHeight: 240, alignItems: "center", justifyContent: "center", gap: 10, backgroundColor: "#1d2420" },
   loadingText: { color: "#a7b1a5" },
   mapBusy: {

@@ -17,6 +17,7 @@ const mapMocks = vi.hoisted(() => {
     triggerDragEnd() { this.handler?.(); }
   }
   class FakeMap {
+    options: unknown;
     handlers = new Map<string, Handler>();
     source = { setData: vi.fn() };
     canvas = { style: { cursor: "" } };
@@ -24,12 +25,13 @@ const mapMocks = vi.hoisted(() => {
     addLayer = vi.fn();
     remove = vi.fn();
     setPaintProperty = vi.fn();
+    easeTo = vi.fn();
     getSource = vi.fn(() => this.source);
     getLayer = vi.fn(() => ({ id: "published-segments-line" }));
     getCanvas = vi.fn(() => this.canvas);
     isStyleLoaded = vi.fn(() => true);
     queryRenderedFeatures = vi.fn(() => []);
-    constructor() { latestMap = this; }
+    constructor(options?: unknown) { this.options = options; latestMap = this; }
     on(event: string, layerOrHandler: string | Handler, possibleHandler?: Handler) {
       const layer = typeof layerOrHandler === "string" ? layerOrHandler : "";
       const handler = typeof layerOrHandler === "function" ? layerOrHandler : possibleHandler;
@@ -154,5 +156,28 @@ describe("MapCanvas", () => {
     mapMocks.markers[0].position = { lat: -33.8685, lng: 151.2115 };
     act(() => mapMocks.markers[0].triggerDragEnd());
     expect(onControlMove).toHaveBeenCalledWith("cp-0001", { lat: -33.8685, lng: 151.2115, elevationM: 8 });
+  });
+
+  it("exposes a 2D/3D map mode without hiding route overlays", () => {
+    render(<MapCanvas segments={[]} selectedId={null} onSelect={vi.fn()} onTilesReady={vi.fn()} onTilesError={vi.fn()} />);
+    act(() => mapMocks.latest()?.trigger("load"));
+    expect(mapMocks.latest()?.options).toEqual(expect.objectContaining({ bearing: -18, pitch: 48 }));
+    expect(screen.getByLabelText("Map of Sydney CBD")).toHaveAttribute("data-map-mode", "3d");
+    expect(screen.getByRole("button", { name: "Switch map to 2D" })).toBeVisible();
+    expect(mapMocks.latest()?.addLayer.mock.calls.map(([layer]) => (layer as { id: string }).id)).toEqual([
+      "published-segments-line",
+      "draft-route-line",
+      "selected-route-line",
+      "profile-marker-circle"
+    ]);
+
+    act(() => screen.getByRole("button", { name: "Switch map to 2D" }).click());
+    expect(mapMocks.latest()?.easeTo).toHaveBeenLastCalledWith({ bearing: 0, duration: 520, pitch: 0 });
+    expect(screen.getByLabelText("Map of Sydney CBD")).toHaveAttribute("data-map-mode", "2d");
+    expect(screen.getByRole("button", { name: "Switch map to 3D" })).toBeVisible();
+
+    act(() => screen.getByRole("button", { name: "Switch map to 3D" }).click());
+    expect(mapMocks.latest()?.easeTo).toHaveBeenLastCalledWith({ bearing: -18, duration: 520, pitch: 48 });
+    expect(screen.getByLabelText("Map of Sydney CBD")).toHaveAttribute("data-map-mode", "3d");
   });
 });

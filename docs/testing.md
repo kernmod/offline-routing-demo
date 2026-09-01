@@ -62,10 +62,10 @@ The Route Studio build order is enforced by tests:
 | P2 fixture coverage | `node --test tools/fixtures/*.test.mjs` via root gate | hostile fixture coverage retained in root gate | green |
 | P3 Rust native/FFI | `cargo test --workspace` | Rust core, FFI, WASM, tile server all pass | green |
 | P4 WASM build | `pnpm build:wasm` + committed-output diff gate | pinned Rust 1.94.1, wasm-bindgen 0.2.127, isolated cold target, stable path remapping, and Ubuntu 22.04 build image regenerate byte-identical browser output in local build, CI, and Pages | green |
-| P4 viewer parity | `pnpm --filter @offline-routing/viewer test:coverage` | 43 tests, 95.48% lines, 84.23% branches, 92.64% funcs, including real generated-WASM parity and strict publication-response validation | green |
+| P4 viewer parity | `pnpm --filter @offline-routing/viewer test:coverage` | 44 tests, 95.61% lines, 84.21% branches, 92.85% funcs, including real generated-WASM parity, strict publication-response validation, and 2D/3D cartography checks | green |
 | P5 API | `pnpm --filter @offline-routing/api test:coverage` | 29 tests, 99.29% lines, 90.63% branches, 100% funcs | green |
-| P6 mobile package | `pnpm coverage:mobile` | 48 tests, 95.55% lines, 83.93% branches, 90.76% funcs | green |
-| P7 browser E2E | `pnpm --filter @offline-routing/viewer test:e2e` | 6/6 pass desktop + mobile viewport | green |
+| P6 mobile package | `pnpm coverage:mobile` | 49 tests, 95.55% lines, 83.93% branches, 90.76% funcs | green |
+| P7 browser E2E | `pnpm --filter @offline-routing/viewer test:e2e` | 8/8 pass desktop + mobile viewport, including the 2D/3D cartography flow | green |
 | P8 root coverage | `pnpm test:coverage` | LCOV_OK for root, mobile, offline-router, api, viewer, and shared | green |
 | P8 Rust coverage | `cargo llvm-cov --workspace --all-targets --exclude cch-routing-lite-wasm --fail-under-lines 80` | `coverage/rust.lcov` regenerated; the browser-only WASM crate stays covered by `pnpm build:wasm` and viewer parity/E2E gates | green |
 | P8 live `v2` | `pnpm verify:live-api --url <worker>` | `LIVE_API_OK health=200 publish=201 replay=200 conflict=409 nearby=200` against the public Worker | green |
@@ -103,7 +103,7 @@ pnpm verify:live-api --url https://your-worker.workers.dev
   bounded streaming request reads, the 10-record response cap, indexed cell query
   path, and exact bbox reads;
 - browser tests for WASM routing, editing, trimming, confirmation, publish, and
-  mobile viewport accessibility;
+  mobile viewport accessibility, 2D/3D toggle, and extrusion presence;
 - mobile controller tests for offline editing, retry, persistence, and network
-  quarantine;
+  quarantine, plus the native 2D/3D switch accessible control;
 - device scripts for airplane-mode boot, local route, and benchmark logging.
