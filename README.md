@@ -202,7 +202,7 @@ The iOS packaging path is intentionally public and narrow:
 - the public `offlineroutingdemo://route?...` deep link remains available for
   normal manual use.
 
-Physical iPhone installation uses EAS remote credentials only. Nothing Apple is
+Physical iOS-device installation uses EAS remote credentials only. Nothing Apple is
 committed here: the repo expects `EXPO_TOKEN`, and for CI-based ad hoc/TestFlight
 distribution it can also consume `EXPO_ASC_API_KEY_PATH` or a temporary file
 derived from `EXPO_ASC_API_KEY_BASE64`, plus `EXPO_ASC_KEY_ID` and
