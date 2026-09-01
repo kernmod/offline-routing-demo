@@ -9,6 +9,7 @@ fi
 
 generated_targets=(
   "$demo_root/apps/mobile/android/app/.cxx"
+  "$demo_root/apps/mobile/android/.kotlin"
   "$demo_root/packages/offline-router/android/.cxx"
   "$demo_root/apps/mobile/android/app/debug.keystore"
 )

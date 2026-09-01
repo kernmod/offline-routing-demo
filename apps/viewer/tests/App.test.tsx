@@ -16,10 +16,17 @@ afterEach(cleanup);
 
 const seed = {
   id: "seed-sydney-cbd-001",
+  name: "seeded reference",
+  publicationState: "published",
   encodedGeometry: "vxdr_Awgal_Hfw@gw@",
   pointCount: 2,
   distanceM: 130,
-  isSeed: true
+  isSeed: true,
+  elevationsM: [8, 10],
+  controlPoints: [0, 1],
+  elevationGainM: 2,
+  elevationLossM: 0,
+  metricsVersion: 2
 };
 
 describe("App", () => {
@@ -49,7 +56,7 @@ describe("App", () => {
 
     expect(await screen.findByText("seeded reference")).toBeVisible();
     expect(fetcher).toHaveBeenCalledWith(
-      expect.stringMatching(/^http:\/\/localhost(?::\d+)?\/segments\?/),
+      expect.stringMatching(/^http:\/\/localhost(?::\d+)?\/v2\/segments\?/),
       expect.any(Object)
     );
     window.history.replaceState({}, "", "/");

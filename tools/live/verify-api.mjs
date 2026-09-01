@@ -18,7 +18,7 @@ export async function runLiveApiCli({
     const apiUrl = resolveLiveApiUrl(argv, env);
     const result = await verifyLiveApi({ apiUrl, fetchImpl, lookupFactory, randomUUID: uuid });
     stdout.write(
-      `LIVE_API_OK health=${result.statuses.health} publish=${result.statuses.publish} nearby=${result.statuses.nearby}\n`
+      `LIVE_API_OK health=${result.statuses.health} publish=${result.statuses.publish} replay=${result.statuses.replay} conflict=${result.statuses.conflict} nearby=${result.statuses.nearby}\n`
     );
     return 0;
   } catch (error) {

@@ -9,6 +9,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { join, relative, resolve } from "node:path";
+import { inflateSync } from "node:zlib";
 
 export const FIXTURE_BBOX = [151.204, -33.873, 151.217, -33.862];
 export const MIN_ZOOM = 13;
@@ -148,6 +149,136 @@ function lonToWorldX(lon, zoom) {
 function latToWorldY(lat, zoom) {
   const radians = (lat * Math.PI) / 180;
   return ((1 - Math.asinh(Math.tan(radians)) / Math.PI) / 2) * 2 ** zoom;
+}
+
+function paethPredictor(left, above, upperLeft) {
+  const estimate = left + above - upperLeft;
+  const leftDistance = Math.abs(estimate - left);
+  const aboveDistance = Math.abs(estimate - above);
+  const upperLeftDistance = Math.abs(estimate - upperLeft);
+  if (leftDistance <= aboveDistance && leftDistance <= upperLeftDistance) return left;
+  return aboveDistance <= upperLeftDistance ? above : upperLeft;
+}
+
+/** Decode the pinned 8-bit RGB/RGBA Terrarium PNGs without a native image dependency. */
+export function decodeTerrariumPng(bytes) {
+  const signature = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
+  if (bytes.length < signature.length || !bytes.subarray(0, 8).equals(signature)) {
+    throw new Error("invalid Terrarium PNG signature");
+  }
+  let cursor = 8;
+  let header = null;
+  const compressed = [];
+  while (cursor + 12 <= bytes.length) {
+    const length = bytes.readUInt32BE(cursor);
+    const type = bytes.subarray(cursor + 4, cursor + 8).toString("ascii");
+    const start = cursor + 8;
+    const end = start + length;
+    if (end + 4 > bytes.length) throw new Error("truncated Terrarium PNG chunk");
+    if (type === "IHDR") {
+      header = {
+        width: bytes.readUInt32BE(start),
+        height: bytes.readUInt32BE(start + 4),
+        bitDepth: bytes[start + 8],
+        colorType: bytes[start + 9],
+        compression: bytes[start + 10],
+        filter: bytes[start + 11],
+        interlace: bytes[start + 12],
+      };
+    } else if (type === "IDAT") compressed.push(bytes.subarray(start, end));
+    cursor = end + 4;
+    if (type === "IEND") break;
+  }
+  if (!header || compressed.length === 0) throw new Error("Terrarium PNG has no image data");
+  if (
+    header.bitDepth !== 8 || ![2, 6].includes(header.colorType) ||
+    header.compression !== 0 || header.filter !== 0 || header.interlace !== 0
+  ) {
+    throw new Error("unsupported Terrarium PNG encoding");
+  }
+  const channels = header.colorType === 2 ? 3 : 4;
+  const stride = header.width * channels;
+  const filtered = inflateSync(Buffer.concat(compressed));
+  if (filtered.length !== (stride + 1) * header.height) {
+    throw new Error("Terrarium PNG raster length mismatch");
+  }
+  const pixels = Buffer.alloc(stride * header.height);
+  for (let row = 0; row < header.height; row += 1) {
+    const filterType = filtered[row * (stride + 1)];
+    if (filterType > 4) throw new Error("unsupported Terrarium PNG row filter");
+    const inputOffset = row * (stride + 1) + 1;
+    const outputOffset = row * stride;
+    for (let column = 0; column < stride; column += 1) {
+      const raw = filtered[inputOffset + column];
+      const left = column >= channels ? pixels[outputOffset + column - channels] : 0;
+      const above = row > 0 ? pixels[outputOffset + column - stride] : 0;
+      const upperLeft = row > 0 && column >= channels
+        ? pixels[outputOffset + column - stride - channels]
+        : 0;
+      const predictor = [0, left, above, Math.floor((left + above) / 2), paethPredictor(left, above, upperLeft)][filterType];
+      pixels[outputOffset + column] = (raw + predictor) & 0xff;
+    }
+  }
+  return { ...header, channels, pixels };
+}
+
+function terrariumPixel(tile, x, y) {
+  if (x < 0 || y < 0 || x >= tile.width || y >= tile.height) {
+    throw new Error("Terrarium pixel outside tile");
+  }
+  const index = (y * tile.width + x) * tile.channels;
+  if (tile.channels === 4 && tile.pixels[index + 3] === 0) throw new Error("Terrarium no-data pixel");
+  const value = tile.pixels[index] * 256 + tile.pixels[index + 1] + tile.pixels[index + 2] / 256 - 32768;
+  if (!Number.isFinite(value) || value <= -32768) throw new Error("Terrarium no-data elevation");
+  return value;
+}
+
+export function loadTerrariumDem(directory) {
+  const sourcePath = join(directory, "source.json");
+  const source = JSON.parse(readFileSync(sourcePath, "utf8"));
+  if (source.encoding !== "terrarium" || source.tileSize !== 256 || !Number.isInteger(source.zoom)) {
+    throw new Error("unsupported DEM source contract");
+  }
+  const tiles = new Map();
+  for (const descriptor of source.tiles) {
+    const path = join(directory, descriptor.path);
+    if (!existsSync(path) || statSync(path).size !== descriptor.bytes || sha256(path) !== descriptor.sha256) {
+      throw new Error(`DEM tile integrity mismatch ${descriptor.x}/${descriptor.y}`);
+    }
+    const decoded = decodeTerrariumPng(readFileSync(path));
+    if (decoded.width !== source.tileSize || decoded.height !== source.tileSize) {
+      throw new Error(`DEM tile dimensions mismatch ${descriptor.x}/${descriptor.y}`);
+    }
+    tiles.set(`${source.zoom}/${descriptor.x}/${descriptor.y}`, decoded);
+  }
+  return { source, tiles, sample: (point) => sampleTerrariumElevation({ source, tiles }, point) };
+}
+
+export function sampleTerrariumElevation(dem, point) {
+  if (!Number.isFinite(point.lat) || !Number.isFinite(point.lng)) throw new TypeError("invalid DEM coordinate");
+  const size = dem.source.tileSize;
+  const globalX = lonToWorldX(point.lng, dem.source.zoom) * size;
+  const globalY = latToWorldY(point.lat, dem.source.zoom) * size;
+  const minX = Math.floor(globalX);
+  const minY = Math.floor(globalY);
+  const fractionX = globalX - minX;
+  const fractionY = globalY - minY;
+  const read = (pixelX, pixelY) => {
+    const tileX = Math.floor(pixelX / size);
+    const tileY = Math.floor(pixelY / size);
+    const tile = dem.tiles.get(`${dem.source.zoom}/${tileX}/${tileY}`);
+    if (!tile) throw new Error(`DEM coverage missing at ${tileX}/${tileY}`);
+    const localX = ((pixelX % size) + size) % size;
+    const localY = ((pixelY % size) + size) % size;
+    return terrariumPixel(tile, localX, localY);
+  };
+  const northWest = read(minX, minY);
+  const northEast = read(minX + 1, minY);
+  const southWest = read(minX, minY + 1);
+  const southEast = read(minX + 1, minY + 1);
+  const north = northWest + (northEast - northWest) * fractionX;
+  const south = southWest + (southEast - southWest) * fractionX;
+  return north + (south - north) * fractionY;
 }
 
 function tilesForBbox(bbox, zoom) {
@@ -377,7 +508,7 @@ function buildStyle() {
   };
 }
 
-function attributionText(source) {
+function attributionText(source, demSource) {
   return `# Sydney fixture attribution
 
 The road data in \`source.osm.json\` is © OpenStreetMap contributors and is
@@ -392,6 +523,27 @@ The normalized source is checked into the repository. Building the runtime
 assets from that file performs no network request. The basemap intentionally
 contains no labels, so the local glyph template is never requested by the
 style; an empty font range is included to keep all style URLs local.
+
+## Elevation
+
+Elevation is derived from the public **Terrain Tiles** dataset managed by
+Mapzen/Tilezen and distributed through the AWS Open Data bucket
+\`elevation-tiles-prod\`. The six checked-in zoom-15 PNGs use the documented
+Terrarium encoding. Their URLs, byte sizes and SHA-256 digests are pinned in
+\`dem/source.json\`, so the regular fixture build makes no network request.
+
+${demSource.attribution}.
+
+The Australian elevation component is published under
+[${demSource.license}](${demSource.licenseUrl}). Product metadata and the
+recommended citation are pinned in \`dem/source.json\`; the Tilezen composite
+attribution remains mandatory.
+
+The upstream mosaic combines public terrain sources and does not expose one
+survey-grade vertical datum for every output pixel. This demo therefore labels
+the profile as derived terrain elevation and does not use it to alter routing
+costs. See the [Terrarium format](${demSource.formatDocumentation}) and
+[upstream attribution requirements](${demSource.attributionDocumentation}).
 `;
 }
 
@@ -419,7 +571,8 @@ function withinBbox(node) {
   );
 }
 
-export function buildRoutingGraph(source) {
+export function buildRoutingGraph(source, dem) {
+  if (!dem || typeof dem.sample !== "function") throw new Error("routing graph requires a DEM sampler");
   const excludedHighways = new Set(["construction", "motorway", "motorway_link", "proposed", "raceway"]);
   const nodes = new Map(source.nodes.filter(withinBbox).map((node) => [node.id, node]));
   const rawEdges = [];
@@ -486,7 +639,9 @@ export function buildRoutingGraph(source) {
   return {
     nodes: largest.map((id) => {
       const node = nodes.get(id);
-      return { lat: node.lat, lng: node.lon };
+      const elevationM = Math.round(dem.sample({ lat: node.lat, lng: node.lon }));
+      if (!Number.isInteger(elevationM)) throw new Error(`missing elevation for OSM node ${id}`);
+      return { lat: node.lat, lng: node.lon, elevationM };
     }),
     arcs: sortedArcs,
   };
@@ -502,12 +657,21 @@ export function buildFixture({ root, out, includeExistingRouting = true }) {
   if (resolve(sourcePath) !== resolve(join(output, "source.osm.json"))) {
     copyFileSync(sourcePath, join(output, "source.osm.json"));
   }
-  const graph = buildRoutingGraph(source);
+  const demRoot = join(fixture, "dem");
+  const dem = loadTerrariumDem(demRoot);
+  if (resolve(demRoot) !== resolve(join(output, "dem"))) {
+    mkdirSync(join(output, "dem/tiles"), { recursive: true });
+    copyFileSync(join(demRoot, "source.json"), join(output, "dem/source.json"));
+    for (const tile of dem.source.tiles) {
+      copyFileSync(join(demRoot, tile.path), join(output, "dem", tile.path));
+    }
+  }
+  const graph = buildRoutingGraph(source, dem);
   writeFileSync(join(output, "graph.json"), `${JSON.stringify(graph)}\n`);
   writeFileSync(join(output, "map.pmtiles"), buildPmtiles(source));
   writeFileSync(join(output, "style.json"), `${JSON.stringify(buildStyle(), null, 2)}\n`);
   writeFileSync(join(output, "glyphs/Offline Sans/0-255.pbf"), Buffer.alloc(0));
-  writeFileSync(join(output, "ATTRIBUTION.md"), attributionText(source));
+  writeFileSync(join(output, "ATTRIBUTION.md"), attributionText(source, dem.source));
 
   const routingPath = join(fixture, "routing.pack");
   if (
@@ -520,11 +684,12 @@ export function buildFixture({ root, out, includeExistingRouting = true }) {
   const assetPaths = [
     "source.osm.json", "graph.json", "map.pmtiles", "style.json",
     "glyphs/Offline Sans/0-255.pbf", "ATTRIBUTION.md",
+    "dem/source.json", ...dem.source.tiles.map((tile) => `dem/${tile.path}`),
     ...(routingReady ? ["routing.pack"] : []),
   ];
   const manifest = {
-    schema_version: 1,
-    id: "sydney-cbd-walking-v1",
+    schema_version: 2,
+    id: "sydney-cbd-walking-v2",
     bbox: FIXTURE_BBOX,
     source: {
       file: "source.osm.json", snapshot: source.snapshot,
@@ -534,7 +699,20 @@ export function buildFixture({ root, out, includeExistingRouting = true }) {
     routing: {
       status: routingReady ? "ready" : "pending", path: "routing.pack", source: "graph.json",
       builder_contract: "cch-routing-lite build-pack",
+      pack_schema: "CCHP2",
       command: "cargo run --release -p cch-routing-lite --bin build-pack -- fixtures/sydney/graph.json fixtures/sydney/routing.pack",
+    },
+    elevation: {
+      provider: dem.source.provider,
+      encoding: dem.source.encoding,
+      zoom: dem.source.zoom,
+      attribution: dem.source.attribution,
+      license: dem.source.license,
+      license_url: dem.source.licenseUrl,
+      vertical_datum: dem.source.verticalDatum,
+      covered_nodes: graph.nodes.length,
+      min_m: Math.min(...graph.nodes.map((node) => node.elevationM)),
+      max_m: Math.max(...graph.nodes.map((node) => node.elevationM)),
     },
     budget: { max_bytes: MAX_FIXTURE_BYTES },
     assets: assetPaths.map((path) => assetRecord(output, path)),
@@ -560,7 +738,7 @@ export function parsePmtilesHeader(bytes) {
 
 export function verifyFixture(fixtureDir) {
   const manifest = JSON.parse(readFileSync(join(fixtureDir, "manifest.json"), "utf8"));
-  if (manifest.schema_version !== 1) throw new Error("unsupported manifest schema");
+  if (manifest.schema_version !== 2) throw new Error("unsupported manifest schema");
   if (JSON.stringify(manifest.bbox) !== JSON.stringify(FIXTURE_BBOX)) throw new Error("manifest bbox drift");
   let declaredBytes = 0;
   for (const asset of manifest.assets) {
@@ -584,6 +762,28 @@ export function verifyFixture(fixtureDir) {
     manifest.source.license !== source.license
   ) {
     throw new Error("manifest/source provenance mismatch");
+  }
+  const dem = loadTerrariumDem(join(fixtureDir, "dem"));
+  if (
+    manifest.elevation.provider !== dem.source.provider ||
+    manifest.elevation.encoding !== dem.source.encoding ||
+    manifest.elevation.zoom !== dem.source.zoom ||
+    manifest.elevation.attribution !== dem.source.attribution ||
+    manifest.elevation.license !== dem.source.license ||
+    manifest.elevation.license_url !== dem.source.licenseUrl ||
+    manifest.elevation.vertical_datum !== dem.source.verticalDatum
+  ) throw new Error("manifest/DEM provenance mismatch");
+  const graph = JSON.parse(readFileSync(join(fixtureDir, "graph.json"), "utf8"));
+  if (graph.nodes.length !== manifest.elevation.covered_nodes) throw new Error("DEM node coverage mismatch");
+  if (graph.nodes.some((node) => !Number.isInteger(node.elevationM))) throw new Error("graph node elevation missing");
+  const elevations = graph.nodes.map((node) => node.elevationM);
+  const minElevation = Math.min(...elevations);
+  const maxElevation = Math.max(...elevations);
+  if (
+    manifest.elevation.min_m !== minElevation ||
+    manifest.elevation.max_m !== maxElevation
+  ) {
+    throw new Error("manifest elevation range mismatch");
   }
   const style = JSON.parse(readFileSync(join(fixtureDir, "style.json"), "utf8"));
   const assertRelative = (value, field) => {

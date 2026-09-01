@@ -13,16 +13,24 @@ The public build pipeline is intentionally split from the mobile runtime:
 4. Basic lower-triangle customization writes directional weights and explicit
    shortcut witnesses.
 5. The graph, CCH topology, customized weights, and unpack provenance are
-   serialized together and compressed into the versioned `CCHP1` artifact.
+   serialized together and compressed into the versioned `CCHP2` artifact.
 6. `Router::from_pack_bytes` validates those arrays but never orders,
    eliminates, or customizes the graph.
 7. A query snaps its endpoints, runs two upward CCH searches, selects their
    best meeting rank, and recursively expands every shortcut back to original
    coordinates.
+8. Integer `elevationM` samples are attached only after shortcut unpacking to
+   derive distance, D+, and D−. They never affect ordering, weights, or query
+   decisions.
 
-The route returned across the public boundary contains geometry and generic
-cost only. Original node identifiers, stable route identifiers, application
-profiles, and product metadata are deliberately absent.
+`Router::route_many` joins 2–16 adjacent legs without duplicating their shared
+junctions and can add a last-to-first closing leg. A failed leg fails the whole
+operation. The two-point `Router::route` API and its `polyline` alias remain
+available for the original demo.
+
+Routes contain generic cost, distance, integer elevation geometry, D+, and D−.
+Original node identifiers, stable route identifiers, application profiles,
+and product metadata are deliberately absent.
 
 ## Correctness gates
 

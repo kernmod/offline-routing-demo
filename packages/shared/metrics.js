@@ -27,3 +27,26 @@ export function routeMetrics(points) {
     distanceM: Math.round(distanceM)
   };
 }
+
+export function routeElevationMetrics(points) {
+  const metrics = routeMetrics(points);
+  let elevationGainM = 0;
+  let elevationLossM = 0;
+
+  for (const [index, point] of points.entries()) {
+    if (!Number.isFinite(point?.elevationM)) {
+      throw new TypeError(`points[${index}].elevationM must be finite`);
+    }
+    if (index === 0) continue;
+    const previous = points[index - 1].elevationM;
+    const delta = point.elevationM - previous;
+    if (delta > 0) elevationGainM += delta;
+    if (delta < 0) elevationLossM += Math.abs(delta);
+  }
+
+  return {
+    ...metrics,
+    elevationGainM: Math.round(elevationGainM),
+    elevationLossM: Math.round(elevationLossM)
+  };
+}

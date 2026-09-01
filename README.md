@@ -1,248 +1,206 @@
 # Offline Routing Demo
 
-An Android map that still boots and routes in airplane mode, backed by a real
-on-device Rust CCH engine. When connectivity returns, the same route can be
-published to a bounded Worker/D1 API and inspected in a browser.
+This repository is a public Route Studio built to show end-to-end engineering
+without exposing product-specific logic. It packages one reproducible Sydney
+fixture, one Rust CCH routing engine, one shared editing state machine, an
+offline-first Android client, an install-free web client, and a bounded
+publish/read API.
 
-![Two taps producing a local route in airplane mode](docs/media/offline-routing-demo.gif)
+The recruiter flow is simple:
 
-The 15-second capture above comes from the final release APK on the named
-Android 14 emulator with airplane mode enabled. A still and the device gate log
-are retained under [`docs/evidence`](docs/evidence/).
+1. open the web viewer or install the APK;
+2. create a route with start, finish, and via points;
+3. inspect the local route, elevation profile, and trim selection;
+4. confirm publication of a named snapshot;
+5. read the same published segment back through the live API.
 
-The repository is a new, self-contained portfolio monorepo. It has no account,
-location permission, hosted basemap, routing endpoint, private infrastructure,
-or inherited product history.
+The public boundary is strict. There is no account system, no hosted routing
+endpoint, no private drafts on the server, no private infrastructure dependency,
+and no business vocabulary or artifacts from the product repo.
 
 ## Try the complete flow
 
-Current delivery status: `LIVE_VERIFIED`. The public fixture, native engine,
-Android release, airplane-mode route, Worker/D1 API, and browser viewer have all
-passed their local and external gates.
-
-| Experience | Link | Status |
-| --- | --- | --- |
-| Android APK | [download v0.1.0](https://github.com/kernmod/offline-routing-demo/releases/download/v0.1.0/offline-routing-demo-cchp1.apk) | offline and live flow verified |
-| Browser viewer | [open the public viewer](https://kernmod.github.io/offline-routing-demo/) | live WebGL/PMTiles verified |
-| Segment API | [offline-routing-segments.yaktrak.workers.dev](https://offline-routing-segments.yaktrak.workers.dev/health) | live publish/read verified |
-
-Playwright reference captures are kept for the
-[desktop viewer](apps/viewer/e2e/viewer-desktop.spec.ts-snapshots/viewer-desktop-desktop-chromium-linux.png)
-and its [mobile layout](apps/viewer/e2e/viewer-mobile.spec.ts-snapshots/viewer-mobile-mobile-chromium-linux.png).
-The final external checks retain the [live viewer](docs/evidence/2026-08-31T20-01-00Z-live-viewer.png)
-and [Android publish/read](docs/evidence/2026-08-31T20-10-00Z-mobile-live.png)
-screens.
-
-The intended user journey is deliberately small:
-
-1. install the APK;
-2. enable airplane mode and cold-start the app;
-3. tap an origin and destination—the route is computed and drawn locally;
-4. reconnect and publish the geometry;
-5. open the viewer and find the same public segment.
+- Browser viewer: <https://kernmod.github.io/offline-routing-demo/>
+- Segment API health: <https://offline-routing-segments.yaktrak.workers.dev/health>
+- Android APK: <https://github.com/kernmod/offline-routing-demo/releases/download/v0.2.0/offline-routing-demo-route-studio.apk>
 
 ## What this demonstrates
 
-- deterministic fixture production from a pinned public OpenStreetMap snapshot;
-- real CCH preprocessing, customization, bidirectional upward query, and
-  recursive shortcut unpacking in Rust;
-- a narrow Rust C ABI and Nitro/C++ bridge with tested buffer ownership and
-  panic barriers;
-- embedded MapLibre/PMTiles rendering through a loopback-only range server;
-- a versioned relational model, parameterized D1 queries, bounded z14 spatial
-  cells, idempotency, TTL, privacy controls, and fail-closed edge rate limiting;
-- a static MapLibre GL JS viewer with real PMTiles WebGL E2E coverage;
-- TDD, property tests, integration tests, named-device evidence, coverage gates,
-  dependency review, secret scanning, and public-boundary auditing.
+- deterministic fixture production from pinned public OpenStreetMap and DEM inputs;
+- a real Rust CCH engine with preprocessing, shortcut unpacking, and multipoint routing;
+- the same router compiled to Nitro/native on Android and to WASM in the browser;
+- one shared `packages/route-studio` domain for multipoint editing, invalidated-leg
+  reroute, undo/redo, loop, trim, elevation metrics, draft persistence, and explicit
+  `draft -> ready -> publishing -> published` transitions;
+- a Cloudflare Worker + D1 API with exact input validation, idempotency, server-derived
+  metrics, z14 spatial cells, TTL, and fail-closed rate limiting;
+- TDD with unit, integration, E2E, device, coverage, and public-boundary checks.
 
 ## Architecture
 
 ```text
-pinned Sydney OSM snapshot
-        │
-        ├── deterministic builder ──> PMTiles + style + manifest
-        └── graph builder ──> CCHP1 pack
-                                  │
-tap A/B ─> React Native ─> Nitro ─> C++ ─> Rust CCH query/unpack
-   │            │                               │
-   │            └──── MapLibre <── loopback PMTiles server
-   │
-   └── explicit online action ─> Worker API ─> D1 segments + z14 cells
-                                      ^                    │
-                                      └── browser viewer <─┘
+public Sydney OSM + DEM
+         │
+         ├── reproducible builders ──> PMTiles + style + manifest
+         └── graph builder ──> CCHP2 routing.pack + SHA-256
+                                      │
+                 ┌────────────────────┴────────────────────┐
+                 v                                         v
+        React Native + Nitro                    React + WASM + MapLibre GL JS
+                 │                                         │
+                 └──── packages/route-studio draft state ─┘
+                                      │
+                             explicit publish only
+                                      │
+                                      v
+                          Worker API + D1 + z14 cells
 ```
 
-Everything above the explicit online action is packaged in the APK. The map
-style points only to `127.0.0.1`; the route screen does not import the network
-client. `POST /segments` and `GET /segments` are user-triggered actions and are
-disabled when no public API URL was injected at build time.
-
-The online model stores encoded geometry plus server-derived distance, point
-count, bbox, timestamps, and z14 cells. Anonymous uploads expire after 24 hours;
-the public seed is permanent. Reads search `segment_cells` first, then apply an
-exact bbox filter. The query plan is recorded in
-[docs/api-explain.md](docs/api-explain.md).
-
-Detailed boundaries live in [architecture](docs/architecture.md) and the
-[architecture decisions](docs/adr/).
+Everything above the publish step is local. The mobile app embeds the map,
+style, DEM-enriched pack, and native engine. The viewer loads the same pack
+bytes and routes locally with WASM. There is no `/route` API and no JavaScript
+graph fallback.
 
 ## Workspace
 
 | Path | Responsibility |
 | --- | --- |
-| `fixtures/sydney` | attributed public inputs and deterministic runtime assets |
-| `crates/cch-routing-lite` | CCH pack build/load/query/unpack |
+| `fixtures/sydney` | public source manifests, DEM crop, attribution, expected outputs |
+| `crates/cch-routing-lite` | CCH pack build/load/query, `routeMany`, elevation-aware unpack |
+| `crates/cch-routing-lite-wasm` | browser WASM boundary for the same pack |
 | `crates/cch-routing-lite-ffi` | ownership-safe C ABI |
-| `crates/tile-server-lite` | loopback-only PMTiles/style HTTP server |
+| `crates/tile-server-lite` | loopback-only PMTiles/style serving for Android |
 | `packages/offline-router` | Nitro/C++ mobile bridge |
-| `packages/shared` | geometry, polyline6, bbox, and z14 contracts |
-| `apps/mobile` | Expo 54 / React Native 0.81 / MapLibre Android app |
-| `apps/api` | Cloudflare Worker and versioned D1 migrations |
-| `apps/viewer` | React/Vite/MapLibre GL JS install-free viewer |
+| `packages/shared` | geometry, bbox, metric, and API contracts |
+| `packages/route-studio` | shared route draft, trim, profile, publish contracts |
+| `apps/mobile` | Expo 54 / React Native 0.81 Route Studio |
+| `apps/viewer` | React/Vite/MapLibre GL JS Route Studio |
+| `apps/api` | Cloudflare Worker + D1 publish/read API |
+
+## Public experiences
+
+- Browser viewer: <https://kernmod.github.io/offline-routing-demo/>
+- Segment API health: <https://offline-routing-segments.yaktrak.workers.dev/health>
+- GitHub releases: <https://github.com/kernmod/offline-routing-demo/releases>
+
+The viewer and API deploy from `main`. The pages workflow publishes the static
+viewer under `/offline-routing-demo/`; the API workflow applies remote D1
+migrations, deploys the Worker, then reruns the live `POST /v2/segments` and
+`GET /v2/segments?bbox=...` contract verifier.
 
 ## Reproduce it
 
-Prerequisites are Node `22.23.2` (see `.node-version`), pnpm `10.24.0`, a stable
-Rust toolchain, and `cargo-llvm-cov` `0.9.0` for the full coverage gate.
+### Local verification
+
+Prerequisites: Node `22.23.2`, pnpm `10.24.0`, Rust `1.94.1`,
+`cargo-llvm-cov 0.9.0`, Android SDK 36 for the release APK.
 
 ```bash
 pnpm install --frozen-lockfile
 
-# Rebuild and compare every public fixture artifact byte-for-byte.
 make fixture
 make verify-fixture
 
-# Static analysis, builds, tests, coverage, cleanup, and public audit.
-make verify-local
+pnpm build:wasm
+pnpm test:coverage
+cargo test --workspace
+cargo llvm-cov --workspace --all-targets --fail-under-lines 80
+pnpm audit:public
 ```
 
-`make fixture` requires no network after checkout. The current `CCHP1` routing
-pack is 1,124,780 bytes with SHA-256:
+`make fixture` is offline after checkout. The current public routing pack is
+`CCHP2` and the committed fixture manifest records provenance, sizes, checksums,
+DEM source licensing, and the routing-pack SHA-256.
 
-```text
-f76d7fb4f9323db1eeb2f6cebe575c8ca3fda94c04e07d45b434f8adb6907088
+### Local app and viewer
+
+```bash
+VITE_API_BASE_URL=http://127.0.0.1:8787 pnpm --filter @offline-routing/viewer dev
+pnpm --filter @offline-routing/mobile build
 ```
 
-The manifest pins provenance, byte sizes, checksums, the Sydney bbox, and a
-5 MB fixture budget in
-[`fixtures/sydney/manifest.json`](fixtures/sydney/manifest.json).
+The browser viewer uses the same `routing.pack` as mobile. The E2E suite fails
+if a `/route` request appears on the network.
 
-### Android release
-
-Android additionally requires SDK 36, NDK 27.1, CMake, an x86_64 or arm64
-device, and `ANDROID_SERIAL`.
+### Android release and device gate
 
 ```bash
 EXPO_PUBLIC_SEGMENTS_API_URL=https://offline-routing-segments.yaktrak.workers.dev \
   ./scripts/build-apk.sh
 
-# With airplane mode already enabled on the named target:
-ANDROID_SERIAL=localhost:5555 \
+ANDROID_SERIAL=localhost:5556 \
   ./scripts/device/verify-release.sh \
-  "$HOME/.offline-routing-demo/releases/offline-routing-demo-cchp1.apk"
+  "$HOME/.offline-routing-demo/releases/offline-routing-demo-route-studio.apk"
 ```
 
-The build creates a demo keystore under the user's home directory and writes
-the APK outside the repository. No signing material is versioned. The device
-gate inspects final APK permissions, installs it, verifies native startup,
-exercises Android back handling, and runs a local route while airplane mode is
-on. The released APK is 64,925,091 bytes with SHA-256
-`7e8693197adebbab079c50974bcba2d2d52e2d2446faabb6980bdb279373a156`.
-The final device proof records the
-[airplane-mode result](docs/evidence/2026-08-31T20-11-16Z-release-device.txt),
-[route screen](docs/evidence/2026-08-31T20-11-16Z-release-device.png), and
-[complete live delivery check](docs/evidence/2026-08-31T20-11-00Z-live-delivery.md).
+The build generates a demo keystore under `$HOME` only. No signing material is
+committed.
 
-### API and viewer development
+### Benchmarks
 
 ```bash
-# Real local D1 migrations and query-plan evidence.
-pnpm --filter @offline-routing/api d1:migrate:local
-pnpm --filter @offline-routing/api d1:explain:local
-
-# Static viewer at http://127.0.0.1:4173.
-VITE_API_BASE_URL=http://127.0.0.1:8787 \
-  pnpm --filter @offline-routing/viewer dev
+ANDROID_SERIAL=localhost:5556 \
+BENCHMARK_DEVICE_NAME='redroid14_x86_64 isolated (AX102)' \
+./scripts/device/benchmark.sh
 ```
 
-The viewer's API origin is fixed by `VITE_API_BASE_URL` at build time. A public
-URL query parameter cannot redirect browser requests to another origin.
+The benchmark exercises the production Nitro/C++/Rust path with a fixed
+1,024-query corpus and records cold-load plus warm-query p50/p95 on the named
+device only.
 
-Production deployment is intentionally explicit. The API workflow refuses the
-placeholder D1 identifier and any non-public `VIEWER_ORIGIN`, validates and writes
-`RATE_LIMIT_SALT` to a mode-0600 ephemeral file before any remote mutation, applies
-versioned migrations non-interactively, then creates or updates the Worker with
-that secret in the same deploy command. GitHub receives three
-secrets (`CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `RATE_LIMIT_SALT`);
-none enters Git or command output. Pages builds the viewer with the repository
-variable `SEGMENTS_API_URL`.
-After deployment, the state-changing contract smoke test is:
+Current named-device run on 2026-09-01:
+
+- device: `redroid14_x86_64 isolated (AX102)`
+- warm-query p50: `1,212 µs`
+- warm-query p95: `1,674 µs`
+- cold pack-load: `136,366 µs`
+
+Retained 20-run named-device baseline from 2026-08-31:
+
+- device: `redroid14_x86_64 isolated (AX102)`
+- warm-query p50 median: `1,177 µs`
+- warm-query p95 median: `1,613 µs`
+- cold pack-load median: `98,508 µs`
+
+## Test posture
+
+The repository follows strict TDD. Route Studio was built in this order:
+
+1. public contract and documentation boundary;
+2. shared multipoint domain;
+3. DEM and `CCHP2` fixture;
+4. native `routeMany` and mobile bridge;
+5. WASM parity;
+6. Worker/D1 `v2` publication;
+7. mobile and browser Route Studio flows;
+8. release, audit, and live verification.
+
+Evidence lives in:
+
+- [docs/testing.md](docs/testing.md)
+- [docs/architecture.md](docs/architecture.md)
+- [docs/adr](docs/adr)
+- [docs/evidence](docs/evidence)
+- [docs/benchmarks](docs/benchmarks)
+
+For the live API contract, rerun:
 
 ```bash
 pnpm verify:live-api --url https://<worker-origin>
 ```
 
-It accepts only the public HTTPS `*.workers.dev` origin produced by this deployment,
-bounds DNS resolution and rejects non-public answers, publishes one bounded Sydney
-segment, and requires the same record to be returned by the bbox query. It prints
-statuses, never request bodies, credentials, URLs, or idempotency keys.
-The first production migration/deploy and `201` → bbox-read proof are recorded
-in [the live API evidence](docs/evidence/2026-08-31T19-49-00Z-live-api.md).
+## Limits
 
-## Performance evidence
+- The fixture covers Sydney CBD only.
+- Drafts stay local in `v1.1`; the server stores published snapshots only.
+- The API stores generic geometry and metrics, not identities or product logic.
+- The benchmark evidence is honest about the named emulator until an arm64 phone
+  run is added.
 
-The benchmark traverses the production Nitro/C++/Rust route path with a fixed
-1,024-query corpus. It records failures and separates pack loading from warm
-queries.
+## Data and licensing
 
-Device: `redroid14_x86_64 isolated (AX102)`, Android 14, x86_64 emulator,
-airplane mode, ADB exposed on loopback only.
-
-| Measurement | Result |
-| --- | ---: |
-| successful warm queries | 20,480 / 20,480 |
-| median of 20 per-run p50 values | 1,177 µs |
-| median of 20 per-run p95 values | 1,613 µs |
-| median cold pack load | 98,508 µs |
-| cold pack load range | 92,363–111,232 µs |
-
-The [isolated-device summary](docs/benchmarks/2026-08-31-redroid14-isolated-cold-summary.md),
-raw JSON/log pairs, and [ADR 0006](docs/adr/0006-device-benchmark.md) retain the
-method and inputs. These numbers characterize the named emulator, not every
-Android phone.
-
-## Test and security posture
-
-Tests were introduced RED before their corresponding implementation. The suite
-contains unit, property, ABI ownership, fixture-to-route, real local D1,
-Playwright WebGL, and Android release/device gates. Thresholds are enforced per
-workspace and globally; focused, skipped, todo, and ignored tests are rejected.
-See [docs/testing.md](docs/testing.md) for the current matrix and commands.
-
-`make audit-public` checks the working tree and reachable Git history for
-unexpected remotes, sensitive vocabulary, endpoints, environment files,
-credentials, native build artifacts, and license gaps. CI also runs gitleaks.
-The dependency gate rejects critical/high findings except two exact unpatched
-Expo/Metro build-time parser advisories whose path and threat boundary are
-locked and documented in
-[public readiness](docs/security/public-readiness.md).
-
-## Limits, by design
-
-- The fixture covers a compact Sydney CBD bbox; this is not a global router.
-- The basemap is intentionally sparse and label-free to keep provenance and
-  reproducibility obvious.
-- The emulator benchmark is retained honestly until a separate physical arm64
-  report is added.
-- Anonymous geometry can still be identifying. The API accepts no account or
-  free text, rounds public timestamps to the minute, stores no IP/User-Agent,
-  and expires user rows after 24 hours.
-- CORS is a browser boundary, not authentication. Edge rate limiting is the
-  abuse control for both reads and writes.
-
-## License and data
-
-Code is dual-licensed MIT or Apache-2.0. The Sydney fixture is derived from
-OpenStreetMap data under ODbL 1.0; attribution and source provenance are in
-[NOTICE.md](NOTICE.md), [docs/data-sources.md](docs/data-sources.md), and beside
-the fixture itself.
+Code is dual-licensed MIT or Apache-2.0. The fixture derives from OpenStreetMap
+under ODbL 1.0 and from a documented public DEM source. Attribution and
+provenance are recorded in [NOTICE.md](NOTICE.md),
+[docs/data-sources.md](docs/data-sources.md), and
+[`fixtures/sydney/ATTRIBUTION.md`](fixtures/sydney/ATTRIBUTION.md).

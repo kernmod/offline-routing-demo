@@ -1,40 +1,47 @@
 # Segment API contract
 
-Status: `LIVE_VERIFIED` on 2026-08-31. The Worker builds, is covered, runs
-against real local D1 through Wrangler, and is deployed at
-`https://offline-routing-segments.yaktrak.workers.dev`. The production smoke
-published a bounded Sydney geometry and read the same record through the bbox
-query; see [`docs/evidence/2026-08-31T19-49-00Z-live-api.md`](evidence/2026-08-31T19-49-00Z-live-api.md).
+Status on 2026-09-01: locally verified for `v2`; public production still needs
+the next `main` deployment. The last live probe against
+`https://offline-routing-segments.yaktrak.workers.dev` returned `404` on
+`POST /v2/segments`, which means the public Worker is still serving the older
+revision.
 
 ## Endpoints
 
 `GET /health` returns `200 {"ok":true}` after a bound D1 query.
 
-`POST /segments` accepts exactly this JSON shape:
+`POST /v2/segments` accepts exactly this JSON shape:
 
 ```json
 {
+  "name": "harbour loop south",
   "geometry": [
-    { "lat": -33.8688, "lng": 151.2093 },
-    { "lat": -33.8695, "lng": 151.2102 }
-  ]
+    { "lat": -33.8688, "lng": 151.2093, "elevationM": 34 },
+    { "lat": -33.8695, "lng": 151.2102, "elevationM": 29 }
+  ],
+  "controlPoints": [0, 1]
 }
 ```
 
-The content type must be `application/json`. The optional `Idempotency-Key`
+The content type must be `application/json`. The required `idempotency-key`
 header is a UUIDv4. The Worker hashes it before storage, then returns `201` for
 the first request and the saved `200` representation for a repeat. It never
-accepts a title, description, client timestamp, elevation, distance, or any
-other free-form field.
+accepts a client status, UUID, bbox, timestamp, distance, ascent, descent, or
+other free-form fields beyond the bounded public `name`.
 
 Successful publish response:
 
 ```json
 {
   "id": "8de15dc3-80d3-4c53-89e2-50b592076cf7",
+  "name": "harbour loop south",
+  "status": "published",
   "encodedGeometry": "vxdr_Awgal_Hfw@gw@",
+  "controlPoints": [0, 1],
   "pointCount": 2,
   "distanceM": 130,
+  "ascentM": 5,
+  "descentM": 10,
   "bbox": { "minLat": -33.8696, "minLng": 151.2091, "maxLat": -33.8687, "maxLng": 151.21 },
   "createdAt": "2026-08-31T12:34:00.000Z",
   "expiresAt": "2026-09-01T12:34:00.000Z",
@@ -42,7 +49,7 @@ Successful publish response:
 }
 ```
 
-`GET /segments?bbox=minLat,minLng,maxLat,maxLng` returns:
+`GET /v2/segments?bbox=minLat,minLng,maxLat,maxLng` returns:
 
 ```json
 { "segments": [/* SegmentRecord values above */] }
@@ -56,9 +63,9 @@ detail is returned.
 ## CORS and abuse boundaries
 
 `ALLOWED_ORIGINS` is a comma-separated allowlist supplied by Worker vars. The
-repository only permits local development origins. A browser origin outside the
-allowlist receives `403`; a native client has no `Origin` header and is not
-blocked by CORS.
+repository permits the public Pages origin and local development origins. A
+browser origin outside the allowlist receives `403`; a native client has no
+`Origin` header and is not blocked by CORS.
 
 Every publish and nearby read passes through Cloudflare's native `RATE_LIMITER`
 binding (30 requests per 60 seconds). The Worker derives its key as
@@ -71,16 +78,18 @@ explicit fake binding and salt. Cloudflare's rate limiting is still local to an
 edge location and eventually consistent, so it is an abuse guard—not accounting
 or an authentication claim.
 
-The Worker neither logs nor stores free text, IP, User-Agent, request bodies,
-or raw idempotency keys. It stores encoded geometry, derived spatial metadata,
-timestamps, a seed flag, and a SHA-256 idempotency digest only.
+The Worker neither logs nor stores IP, User-Agent, request bodies, or raw
+idempotency keys. It stores the normalized public name, encoded geometry,
+control anchors, derived spatial metadata, timestamps, publication status, a
+seed flag, and a SHA-256 idempotency digest only.
 
 ## Query plan
 
 The nearby query is intentionally two-stage:
 
 ```sql
-SELECT DISTINCT s.id, s.encoded_geometry, s.point_count, s.distance_m,
+SELECT DISTINCT s.id, s.name, s.status, s.encoded_geometry, s.control_points_json,
+  s.point_count, s.distance_m, s.ascent_m, s.descent_m,
   s.min_lat, s.min_lng, s.max_lat, s.max_lng, s.created_at, s.expires_at, s.is_seed
 FROM segment_cells sc
 JOIN segments s ON s.id = sc.segment_id

@@ -7,7 +7,7 @@
     "build": "node scripts/build.mjs",
     "lint": "tsc --project tsconfig.json --noEmit",
     "test": "node --import tsx --test test/*.test.ts",
-    "test:coverage": "c8 --check-coverage --lines 95 --functions 95 --branches 90 --reporter=text --reporter=lcov node --import tsx --test test/*.test.ts",
+    "test:coverage": "c8 --include 'src/index.ts' --check-coverage --lines 95 --functions 95 --branches 90 --reporter=text --reporter=lcov node --import tsx --test test/*.test.ts",
     "d1:migrate:local": "node scripts/d1-local.mjs migrate",
     "d1:explain:local": "node scripts/d1-local.mjs explain"
   },

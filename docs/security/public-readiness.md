@@ -1,18 +1,22 @@
 # Public Readiness
 
-Status on 2026-08-31: `LIVE_VERIFIED`.
+Status on 2026-09-01: local publication gates are closed; public live verification is pending the next `main` deployment.
 
 ## Local evidence closed
 
-- `make verify-local` is green. It runs formatting, lint, all JavaScript and Rust
-  tests, coverage collection, generated-output cleanup, and the public audit.
-- `make audit-public` is green. The structure, license, and denylist checks pass
-  on the clean-history working tree.
+- `make verify-local` is rerun before publication. It covers formatting, lint,
+  JavaScript and Rust tests, coverage, generated-output cleanup, and the public
+  audit.
+- `pnpm audit:public` is green after two explicit fixes: repo-local Kotlin
+  compiler artefacts are now part of generated cleanup, and public docs no
+  longer mention private map/game chunk formats.
 - gitleaks `v8.28.0` reports no leak on the publication file set or reachable
   public Git history; the scan is repeated before each publication commit.
-- `docs/evidence/2026-08-31-redroid14-airplane.md` records the device-local
-  airplane-mode route proof and links the underlying screenshot, UI dump, logcat,
-  and process-scoped `strace -e connect` capture.
+- `docs/evidence/2026-09-01T01-09-48Z-release-device.txt` records the current
+  release-device gate on `localhost:5556`.
+- `docs/benchmarks/2026-09-01T01-06-14Z.json` records the current Nitro/native
+  benchmark on `redroid14_x86_64 isolated (AX102)`: cold pack load 136,366 µs,
+  warm p50 1,212 µs, warm p95 1,674 µs across 1,024 queries.
 - `docs/testing.md` records the TDD contract and the latest local coverage values.
 - `pnpm audit:dependencies` blocks every critical/high advisory except two
   exact upstream `image-size` advisories with no patched release
@@ -35,12 +39,8 @@ Status on 2026-08-31: `LIVE_VERIFIED`.
 
 ## Live delivery evidence
 
-- The Worker/D1 API passed external health, publish, and bbox-read checks at its
-  public HTTPS origin.
-- GitHub Pages serves the viewer and embedded PMTiles with HTTPS and byte ranges;
-  a headless external browser rendered the WebGL canvas with no failed request.
-- The final APK embeds only the public API origin. A fresh Android 14 emulator
-  published and reloaded a segment online, then passed the release gate again in
-  airplane mode with a native local route.
-- The public URLs, release hash, device logs, and screenshots are consolidated in
-  `docs/evidence/2026-08-31T20-11-00Z-live-delivery.md`.
+- The public Worker currently still returns `404` on `POST /v2/segments`, which
+  means the older API revision is still deployed at the public origin.
+- The GitHub Pages and Worker workflows are in place to close this gap from
+  `main`; once they succeed, the live verifier and browser smoke must be rerun
+  before claiming `LIVE_VERIFIED`.

@@ -1,0 +1,70 @@
+{
+  "schemaVersion": 1,
+  "provider": "Mapzen / Tilezen Terrain Tiles on AWS Open Data",
+  "dataset": "Terrain Tiles",
+  "registryUrl": "https://registry.opendata.aws/terrain-tiles/",
+  "formatDocumentation": "https://github.com/tilezen/joerd/blob/master/docs/formats.md",
+  "attributionDocumentation": "https://github.com/tilezen/joerd/blob/master/docs/attribution.md",
+  "upstreamProduct": "Geoscience Australia SRTM 1 second DEM version 1.0 (Australian component)",
+  "productMetadataUrl": "https://knowledge.dea.ga.gov.au/data/external-data/ga-srtm-1-second-dem/",
+  "license": "CC-BY-4.0",
+  "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+  "citation": "Gallant, J.; Wilson, N.; Dowling, T.; Read, A.; Inskeep, C. (2011), SRTM-derived 1 Second Digital Elevation Models Version 1.0, Geoscience Australia",
+  "encoding": "terrarium",
+  "projection": "EPSG:3857",
+  "verticalDatum": "upstream-source-dependent; not normalized for survey use",
+  "zoom": 15,
+  "tileSize": 256,
+  "acquiredAt": "2026-09-01T00:00:00Z",
+  "attribution": "Terrain data processed by Mapzen/Tilezen; Australia terrain data © Commonwealth of Australia (Geoscience Australia) 2017",
+  "tiles": [
+    {
+      "x": 30146,
+      "y": 19663,
+      "path": "tiles/15-30146-19663.png",
+      "url": "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/15/30146/19663.png",
+      "bytes": 65281,
+      "sha256": "7017df895ceda7d2d4ca2865dc5b6ec5e5a07d22105ee50c62944b192039a7df"
+    },
+    {
+      "x": 30146,
+      "y": 19664,
+      "path": "tiles/15-30146-19664.png",
+      "url": "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/15/30146/19664.png",
+      "bytes": 75640,
+      "sha256": "b21df2375e4bd108ac378fbbba28c8b0bc8e24559dd5439946289473645e5b61"
+    },
+    {
+      "x": 30147,
+      "y": 19663,
+      "path": "tiles/15-30147-19663.png",
+      "url": "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/15/30147/19663.png",
+      "bytes": 90457,
+      "sha256": "10ae58bfdae71690f05e234ce8be3e46ab7c84f9527a70e74798ac57cfafc58e"
+    },
+    {
+      "x": 30147,
+      "y": 19664,
+      "path": "tiles/15-30147-19664.png",
+      "url": "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/15/30147/19664.png",
+      "bytes": 85202,
+      "sha256": "898794aa7e4df938941e181ffe34daf466f07e9ebe846e73dd9c10d6cfe5d2dc"
+    },
+    {
+      "x": 30148,
+      "y": 19663,
+      "path": "tiles/15-30148-19663.png",
+      "url": "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/15/30148/19663.png",
+      "bytes": 66780,
+      "sha256": "a112e29ed5654d604c50bcdc40fe4f7a2ec96f57704c014d83230a444bef38a5"
+    },
+    {
+      "x": 30148,
+      "y": 19664,
+      "path": "tiles/15-30148-19664.png",
+      "url": "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/15/30148/19664.png",
+      "bytes": 70735,
+      "sha256": "5f9e20beeed9e3912eb66b942f00067edfa857d40b3d22e6dfe40941cb74b65b"
+    }
+  ]
+}

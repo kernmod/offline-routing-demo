@@ -22,7 +22,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use zstd::stream::encode_all;
 
-const PACK_MAGIC: &[u8; 5] = b"CCHP1";
+const PACK_MAGIC: &[u8; 5] = b"CCHP2";
 const MAX_DECOMPRESSED_PACK_BYTES: usize = 32 * 1024 * 1024;
 const PACK_COMPRESSION_LEVEL: i32 = 9;
 const DEFAULT_SNAP_DISTANCE_M: f64 = 250.0;
@@ -52,6 +52,46 @@ impl Coordinate {
     }
 }
 
+/// Public graph node enriched with an integer elevation sample in metres.
+///
+/// Elevation is serialized for display metrics only. It never participates in
+/// ordering, customization, snapping, or route cost.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GraphNode {
+    pub lat: f64,
+    pub lng: f64,
+    pub elevation_m: i32,
+}
+
+impl GraphNode {
+    #[must_use]
+    pub const fn new(lat: f64, lng: f64, elevation_m: i32) -> Self {
+        Self {
+            lat,
+            lng,
+            elevation_m,
+        }
+    }
+
+    #[must_use]
+    pub const fn coordinate(self) -> Coordinate {
+        Coordinate::new(self.lat, self.lng)
+    }
+}
+
+impl From<Coordinate> for GraphNode {
+    fn from(coordinate: Coordinate) -> Self {
+        Self::new(coordinate.lat, coordinate.lng, 0)
+    }
+}
+
+impl From<GraphNode> for Coordinate {
+    fn from(node: GraphNode) -> Self {
+        node.coordinate()
+    }
+}
+
 /// Directed original graph arc and its positive generic cost.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PackArc {
@@ -70,14 +110,14 @@ impl PackArc {
 /// Public deterministic graph input for the pack builder.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct GraphInput {
-    pub nodes: Vec<Coordinate>,
+    pub nodes: Vec<GraphNode>,
     pub arcs: Vec<PackArc>,
 }
 
 /// Advanced build input with explicit `rank[node] = contraction rank`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BuildConfig {
-    pub nodes: Vec<Coordinate>,
+    pub nodes: Vec<GraphNode>,
     pub arcs: Vec<PackArc>,
     pub ranks: Vec<u32>,
 }
@@ -122,7 +162,7 @@ impl BuildConfig {
 /// Validated immutable CCH pack.
 #[derive(Debug, Clone)]
 pub struct LoadedPack {
-    nodes: Vec<Coordinate>,
+    nodes: Vec<GraphNode>,
     arcs: Vec<PackArc>,
     cch: CchStructure,
     weights: CchWeights,
@@ -132,7 +172,7 @@ impl LoadedPack {
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, RouterError> {
         let body = bytes
             .strip_prefix(PACK_MAGIC)
-            .ok_or_else(|| RouterError::InvalidPack("missing CCHP1 header".into()))?;
+            .ok_or_else(|| RouterError::InvalidPack("missing CCHP2 header".into()))?;
         let decompressed = decode_pack_body(body)?;
         let disk: DiskPack = serde_json::from_slice(&decompressed)
             .map_err(|error| RouterError::InvalidPack(error.to_string()))?;
@@ -238,8 +278,10 @@ impl Router {
                 target = (target + 1) % node_count;
             }
             let started = Instant::now();
-            let result =
-                std::hint::black_box(self.route(self.pack.nodes[source], self.pack.nodes[target]));
+            let result = std::hint::black_box(self.route(
+                self.pack.nodes[source].coordinate(),
+                self.pack.nodes[target].coordinate(),
+            ));
             let elapsed = started.elapsed().as_nanos();
             durations_ns.push(u64::try_from(elapsed).unwrap_or(u64::MAX));
             successes += usize::from(result.is_ok());
@@ -259,9 +301,13 @@ impl Router {
     }
 
     /// Snap, run a bidirectional upward CCH query, and unpack shortcuts.
-    pub fn route(&self, origin: Coordinate, destination: Coordinate) -> Result<Route, RouterError> {
-        let source = self.snap(origin)?;
-        let target = self.snap(destination)?;
+    pub fn route(
+        &self,
+        origin: impl Into<Coordinate>,
+        destination: impl Into<Coordinate>,
+    ) -> Result<Route, RouterError> {
+        let source = self.snap(origin.into())?;
+        let target = self.snap(destination.into())?;
         let (total_weight, cch_path) = query(&self.pack.cch, &self.pack.weights, source, target)?
             .ok_or(RouterError::NoRoute)?;
         let edge_ids = unpack(&self.pack.cch, &self.pack.weights, &cch_path)?;
@@ -271,13 +317,65 @@ impl Router {
                 "unpacked route does not reach target".into(),
             ));
         }
-        let polyline = node_ids
+        let geometry: Vec<RoutePoint> = node_ids
             .iter()
-            .map(|&node| self.pack.nodes[node as usize])
+            .map(|&node| RoutePoint::from(self.pack.nodes[node as usize]))
             .collect();
+        let metrics = route_metrics(&geometry);
         Ok(Route {
             total_weight,
-            polyline,
+            polyline: geometry.clone(),
+            geometry,
+            distance_m: metrics.distance_m,
+            elevation_gain_m: metrics.elevation_gain_m,
+            elevation_loss_m: metrics.elevation_loss_m,
+        })
+    }
+
+    /// Route through 2–16 ordered controls, optionally adding a final
+    /// last-to-first leg. The operation fails atomically if any leg fails.
+    pub fn route_many(
+        &self,
+        controls: &[Coordinate],
+        closed_loop: bool,
+    ) -> Result<MultiRoute, RouterError> {
+        if !(2..=16).contains(&controls.len()) {
+            return Err(RouterError::InvalidControlCount {
+                count: controls.len(),
+            });
+        }
+
+        let leg_count = controls.len() - 1 + usize::from(closed_loop);
+        let mut legs = Vec::with_capacity(leg_count);
+        for index in 0..leg_count {
+            let destination = if index + 1 == controls.len() {
+                controls[0]
+            } else {
+                controls[index + 1]
+            };
+            legs.push(self.route(controls[index], destination)?);
+        }
+
+        let mut geometry = Vec::new();
+        for leg in &legs {
+            let skip = usize::from(!geometry.is_empty());
+            geometry.extend(leg.geometry.iter().skip(skip).copied());
+        }
+        let total_weight = legs.iter().try_fold(0_u64, |total, leg| {
+            total
+                .checked_add(leg.total_weight)
+                .ok_or(RouterError::CostOverflow)
+        })?;
+
+        Ok(MultiRoute {
+            control_count: controls.len(),
+            closed_loop,
+            distance_m: legs.iter().map(|leg| leg.distance_m).sum(),
+            elevation_gain_m: legs.iter().map(|leg| leg.elevation_gain_m).sum(),
+            elevation_loss_m: legs.iter().map(|leg| leg.elevation_loss_m).sum(),
+            legs,
+            geometry,
+            total_weight,
         })
     }
 
@@ -290,7 +388,12 @@ impl Router {
             .nodes
             .iter()
             .enumerate()
-            .map(|(index, &candidate)| (index as u32, haversine_m(coordinate, candidate)))
+            .map(|(index, &candidate)| {
+                (
+                    index as u32,
+                    haversine_m(coordinate, candidate.coordinate()),
+                )
+            })
             .min_by(|left, right| left.1.total_cmp(&right.1))
             .ok_or_else(|| RouterError::InvalidPack("pack has no nodes".into()))?;
         if distance_m > self.max_snap_distance_m {
@@ -325,11 +428,62 @@ pub struct BenchmarkReport {
     pub max_micros: u64,
 }
 
-/// Route result without any stable identity or application-specific metadata.
+/// Route geometry point with public elevation in metres.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RoutePoint {
+    pub lat: f64,
+    pub lng: f64,
+    pub elevation_m: i32,
+}
+
+impl From<GraphNode> for RoutePoint {
+    fn from(node: GraphNode) -> Self {
+        Self {
+            lat: node.lat,
+            lng: node.lng,
+            elevation_m: node.elevation_m,
+        }
+    }
+}
+
+impl PartialEq<GraphNode> for RoutePoint {
+    fn eq(&self, other: &GraphNode) -> bool {
+        self.lat == other.lat && self.lng == other.lng && self.elevation_m == other.elevation_m
+    }
+}
+
+impl RoutePoint {
+    #[must_use]
+    pub const fn coordinate(self) -> Coordinate {
+        Coordinate::new(self.lat, self.lng)
+    }
+}
+
+/// Route result without stable identity or application-specific metadata.
 #[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Route {
     pub total_weight: u64,
-    pub polyline: Vec<Coordinate>,
+    pub polyline: Vec<RoutePoint>,
+    pub geometry: Vec<RoutePoint>,
+    pub distance_m: u64,
+    pub elevation_gain_m: u64,
+    pub elevation_loss_m: u64,
+}
+
+/// Ordered multipoint route and its independently inspectable adjacent legs.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MultiRoute {
+    pub control_count: usize,
+    pub closed_loop: bool,
+    pub legs: Vec<Route>,
+    pub geometry: Vec<RoutePoint>,
+    pub total_weight: u64,
+    pub distance_m: u64,
+    pub elevation_gain_m: u64,
+    pub elevation_loss_m: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -338,10 +492,11 @@ pub struct BenchCorpus {
 }
 
 impl BenchCorpus {
-    pub fn from_routes(
-        router: &Router,
-        requests: &[(Coordinate, Coordinate)],
-    ) -> Result<Self, RouterError> {
+    pub fn from_routes<O, D>(router: &Router, requests: &[(O, D)]) -> Result<Self, RouterError>
+    where
+        O: Copy + Into<Coordinate>,
+        D: Copy + Into<Coordinate>,
+    {
         Ok(Self {
             routes: requests
                 .iter()
@@ -370,6 +525,8 @@ pub enum RouterError {
     },
     #[error("no route between snapped nodes")]
     NoRoute,
+    #[error("route requires between 2 and 16 controls, received {count}")]
+    InvalidControlCount { count: usize },
     #[error("routing cost exceeds the representable pack cost domain")]
     CostOverflow,
     #[error("could not read routing pack: {0}")]
@@ -378,7 +535,7 @@ pub enum RouterError {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct DiskPack {
-    nodes: Vec<Coordinate>,
+    nodes: Vec<GraphNode>,
     arcs: Vec<PackArc>,
     cch: CchStructure,
     weights: CchWeights,
@@ -405,12 +562,12 @@ impl DiskPack {
     }
 }
 
-fn validate_nodes(nodes: &[Coordinate]) -> Result<(), RouterError> {
+fn validate_nodes(nodes: &[GraphNode]) -> Result<(), RouterError> {
     if nodes.is_empty()
         || nodes
             .iter()
             .copied()
-            .any(|coordinate| !valid_coordinate(coordinate))
+            .any(|node| !valid_coordinate(node.coordinate()))
     {
         return Err(RouterError::InvalidPack(
             "nodes must be non-empty finite WGS84 coordinates".into(),
@@ -420,6 +577,33 @@ fn validate_nodes(nodes: &[Coordinate]) -> Result<(), RouterError> {
         return Err(RouterError::InvalidPack("graph has too many nodes".into()));
     }
     Ok(())
+}
+
+#[derive(Debug, Clone, Copy)]
+struct RouteMetrics {
+    distance_m: u64,
+    elevation_gain_m: u64,
+    elevation_loss_m: u64,
+}
+
+fn route_metrics(geometry: &[RoutePoint]) -> RouteMetrics {
+    let mut distance_m = 0.0;
+    let mut elevation_gain_m = 0_u64;
+    let mut elevation_loss_m = 0_u64;
+    for pair in geometry.windows(2) {
+        distance_m += haversine_m(pair[0].coordinate(), pair[1].coordinate());
+        let delta = i64::from(pair[1].elevation_m) - i64::from(pair[0].elevation_m);
+        if delta >= 0 {
+            elevation_gain_m = elevation_gain_m.saturating_add(delta as u64);
+        } else {
+            elevation_loss_m = elevation_loss_m.saturating_add(delta.unsigned_abs());
+        }
+    }
+    RouteMetrics {
+        distance_m: distance_m.round() as u64,
+        elevation_gain_m,
+        elevation_loss_m,
+    }
 }
 
 fn valid_coordinate(coordinate: Coordinate) -> bool {
@@ -455,7 +639,7 @@ mod tests {
     #[test]
     fn loading_does_not_rebuild_or_customize() {
         let config = BuildConfig {
-            nodes: vec![Coordinate::new(0.0, 0.0), Coordinate::new(0.0, 0.001)],
+            nodes: vec![GraphNode::new(0.0, 0.0, 0), GraphNode::new(0.0, 0.001, 0)],
             arcs: vec![PackArc::new(0, 1, 1)],
             ranks: vec![0, 1],
         };
@@ -470,9 +654,9 @@ mod tests {
     fn cch_query_traverses_one_shortcut_then_unpack_restores_original_geometry() {
         let config = BuildConfig {
             nodes: vec![
-                Coordinate::new(45.0, 6.0),
-                Coordinate::new(45.0, 6.0001),
-                Coordinate::new(45.0, 6.0002),
+                GraphNode::new(45.0, 6.0, 0),
+                GraphNode::new(45.0, 6.0001, 0),
+                GraphNode::new(45.0, 6.0002, 0),
             ],
             arcs: vec![PackArc::new(0, 1, 4), PackArc::new(1, 2, 7)],
             ranks: vec![1, 0, 2],
@@ -501,9 +685,9 @@ mod tests {
     fn packs_use_a_compressed_stable_wire_format() {
         let bytes = build_pack(&GraphInput {
             nodes: vec![
-                Coordinate::new(45.0, 6.0),
-                Coordinate::new(45.0, 6.0001),
-                Coordinate::new(45.0, 6.0002),
+                GraphNode::new(45.0, 6.0, 0),
+                GraphNode::new(45.0, 6.0001, 0),
+                GraphNode::new(45.0, 6.0002, 0),
             ],
             arcs: vec![
                 PackArc::new(0, 1, 4),

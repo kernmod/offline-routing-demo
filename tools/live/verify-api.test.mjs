@@ -25,9 +25,16 @@ function verify(options) {
 
 const record = {
   id: SEGMENT_ID,
+  name: "Sydney verifier route",
+  publicationState: "published",
   encodedGeometry: "vxdr_Awgal_Hfw@gw@",
+  elevationsM: [10, 15, 12],
+  controlPoints: [0, 2],
   pointCount: 3,
-  distanceM: 191,
+  distanceM: 221,
+  elevationGainM: 5,
+  elevationLossM: 3,
+  metricsVersion: 2,
   bbox: {
     minLat: -33.8701,
     minLng: 151.2093,
@@ -59,15 +66,38 @@ function urlWithCredentials(origin, username, password = "", queryToken = "") {
 }
 
 function successfulFetch(requests) {
+  let publishCount = 0;
   return async (url, init) => {
     requests.push({ url: String(url), init });
     const path = new URL(url).pathname;
     if (path === "/health") return jsonResponse({ ok: true });
-    if (path === "/segments" && init.method === "POST") return jsonResponse(record, { status: 201 });
-    if (path === "/segments" && init.method === "GET") {
+    if (path === "/v2/segments" && init.method === "POST") {
+      publishCount += 1;
+      const body = JSON.parse(init.body);
+      if (body.name !== "Sydney verifier route") {
+        return jsonResponse({ error: "idempotency_conflict" }, { status: 409 });
+      }
+      return jsonResponse(record, { status: publishCount === 1 ? 201 : 200 });
+    }
+    if (path === "/v2/segments" && init.method === "GET") {
       return jsonResponse({ segments: [{ ...record, encodedGeometry: "different" }, record] });
     }
     throw new Error(`unexpected request path in test: ${path}`);
+  };
+}
+
+function fetchWithPublishRecord(publishedRecord, { replayRecord = publishedRecord, conflictPayload = { error: "idempotency_conflict" } } = {}) {
+  let publishCount = 0;
+  return async (url, init) => {
+    const path = new URL(url).pathname;
+    if (path === "/health") return jsonResponse({ ok: true });
+    if (path === "/v2/segments" && init.method === "POST") {
+      const body = JSON.parse(init.body);
+      if (body.name !== "Sydney verifier route") return jsonResponse(conflictPayload, { status: 409 });
+      publishCount += 1;
+      return jsonResponse(publishCount === 1 ? publishedRecord : replayRecord, { status: publishCount === 1 ? 201 : 200 });
+    }
+    return jsonResponse({ segments: [publishedRecord] });
   };
 }
 
@@ -123,7 +153,7 @@ test("URL resolution requires an explicit CLI flag or environment value", () => 
   assert.throws(() => resolveLiveApiUrl([`--url=${API_URL}`, `--url=${API_URL}`], {}), /only be provided once/);
 });
 
-test("verifier completes health, publish, and bbox read with bounded honest requests", async () => {
+test("verifier completes v2 publish, replay, conflict, and bbox read with bounded honest requests", async () => {
   const requests = [];
   const result = await verify({
     apiUrl: API_URL,
@@ -134,23 +164,28 @@ test("verifier completes health, publish, and bbox read with bounded honest requ
   assert.deepEqual(result, {
     apiOrigin: API_URL,
     segmentId: SEGMENT_ID,
-    statuses: { health: 200, publish: 201, nearby: 200 }
+    statuses: { health: 200, publish: 201, replay: 200, conflict: 409, nearby: 200 }
   });
-  assert.equal(requests.length, 3);
+  assert.equal(requests.length, 5);
   assert.equal(new URL(requests[0].url).pathname, "/health");
   assert.equal(requests[0].init.method, "GET");
   assert.equal(requests[1].init.method, "POST");
   assert.equal(requests[1].init.headers["idempotency-key"], IDEMPOTENCY_KEY);
   assert.equal(requests[1].init.headers.authorization, undefined);
   assert.deepEqual(JSON.parse(requests[1].init.body), {
+    name: "Sydney verifier route",
     geometry: [
-      { lat: -33.8688, lng: 151.2093 },
-      { lat: -33.8695, lng: 151.2102 },
-      { lat: -33.8701, lng: 151.2111 }
-    ]
+      { lat: -33.8688, lng: 151.2093, elevationM: 10 },
+      { lat: -33.8695, lng: 151.2102, elevationM: 15 },
+      { lat: -33.8701, lng: 151.2111, elevationM: 12 }
+    ],
+    controlPoints: [0, 2]
   });
-  const nearbyUrl = new URL(requests[2].url);
-  assert.equal(nearbyUrl.pathname, "/segments");
+  assert.equal(requests[2].init.headers["idempotency-key"], IDEMPOTENCY_KEY);
+  assert.equal(requests[3].init.headers["idempotency-key"], IDEMPOTENCY_KEY);
+  assert.equal(JSON.parse(requests[3].init.body).name, "Sydney verifier route conflict probe");
+  const nearbyUrl = new URL(requests[4].url);
+  assert.equal(nearbyUrl.pathname, "/v2/segments");
   assert.equal(nearbyUrl.searchParams.get("bbox"), "-33.871,151.208,-33.868,151.212");
   for (const { init } of requests) {
     assert.equal(init.redirect, "error");
@@ -163,13 +198,14 @@ test("verifier accepts idempotent publish replay status 200", async () => {
   const requests = [];
   const fetchImpl = async (url, init) => {
     const response = await successfulFetch(requests)(url, init);
-    if (new URL(url).pathname === "/segments" && init.method === "POST") {
+    if (new URL(url).pathname === "/v2/segments" && init.method === "POST" && JSON.parse(init.body).name === "Sydney verifier route") {
       return jsonResponse(record, { status: 200 });
     }
     return response;
   };
   const result = await verify({ apiUrl: API_URL, fetchImpl, randomUUID: () => IDEMPOTENCY_KEY });
   assert.equal(result.statuses.publish, 200);
+  assert.equal(result.statuses.replay, 200);
 });
 
 test("verifier rejects dishonest content and cache headers", async () => {
@@ -205,7 +241,11 @@ test("verifier validates health and segment response contracts", async () => {
   const fetchImpl = async (url, init) => {
     const path = new URL(url).pathname;
     if (path === "/health") return jsonResponse({ ok: true });
-    if (init.method === "POST") return jsonResponse({ ...record, pointCount: 2 }, { status: 201 });
+    if (init.method === "POST") {
+      const body = JSON.parse(init.body);
+      if (body.name !== "Sydney verifier route") return jsonResponse({ error: "idempotency_conflict" }, { status: 409 });
+      return jsonResponse({ ...record, pointCount: 2 }, { status: 201 });
+    }
     return jsonResponse({ segments: [record] });
   };
   await assert.rejects(
@@ -214,11 +254,74 @@ test("verifier validates health and segment response contracts", async () => {
   );
 });
 
+test("verifier rejects malformed v2 record fields at the publication boundary", async () => {
+  const invalidRecords = [
+    { ...record, internal: "leak" },
+    { ...record, id: "not-a-uuid" },
+    { ...record, encodedGeometry: "" },
+    { ...record, name: "" },
+    { ...record, publicationState: "draft" },
+    { ...record, metricsVersion: 3 },
+    { ...record, controlPoints: [0] },
+    { ...record, metricsVersion: 1, elevationsM: [10, 15, 12], elevationGainM: 5, elevationLossM: 3 },
+    { ...record, elevationsM: [10, 15] },
+    { ...record, bbox: null },
+    { ...record, bbox: { ...record.bbox, minLat: "south" } },
+    { ...record, bbox: { ...record.bbox, minLat: -33.86, maxLat: -33.87 } },
+    { ...record, createdAt: "yesterday" },
+    { ...record, isSeed: "false" },
+    { ...record, expiresAt: null },
+    { ...record, expiresAt: record.createdAt },
+    { ...record, isSeed: true, expiresAt: null },
+    { ...record, distanceM: 222 },
+    { ...record, bbox: { ...record.bbox, maxLng: 151.2112 } }
+  ];
+
+  for (const candidate of invalidRecords) {
+    await assert.rejects(
+      verify({
+        apiUrl: API_URL,
+        fetchImpl: fetchWithPublishRecord(candidate),
+        randomUUID: () => IDEMPOTENCY_KEY
+      }),
+      /publish response contract/
+    );
+  }
+});
+
+test("verifier rejects changed replays and malformed idempotency conflicts", async () => {
+  await assert.rejects(
+    verify({
+      apiUrl: API_URL,
+      fetchImpl: fetchWithPublishRecord(record, {
+        replayRecord: { ...record, createdAt: "2026-08-31T12:35:00.000Z" }
+      }),
+      randomUUID: () => IDEMPOTENCY_KEY
+    }),
+    /replay did not return.*unchanged/
+  );
+
+  await assert.rejects(
+    verify({
+      apiUrl: API_URL,
+      fetchImpl: fetchWithPublishRecord(record, { conflictPayload: { error: "internal_error" } }),
+      randomUUID: () => IDEMPOTENCY_KEY
+    }),
+    /conflict response contract/
+  );
+});
+
 test("verifier requires the exact published record in the bbox read", async () => {
+  let publishes = 0;
   const fetchImpl = async (url, init) => {
     const path = new URL(url).pathname;
     if (path === "/health") return jsonResponse({ ok: true });
-    if (init.method === "POST") return jsonResponse(record, { status: 201 });
+    if (init.method === "POST") {
+      const body = JSON.parse(init.body);
+      if (body.name !== "Sydney verifier route") return jsonResponse({ error: "idempotency_conflict" }, { status: 409 });
+      publishes += 1;
+      return jsonResponse(record, { status: publishes === 1 ? 201 : 200 });
+    }
     return jsonResponse({ segments: [{ ...record, encodedGeometry: "tampered" }] });
   };
   await assert.rejects(
@@ -286,6 +389,18 @@ test("verifier resolves hostnames and refuses any non-public address before fetc
   );
   assert.ok(Date.now() - startedAt < 500, "DNS timeout must bound the verifier");
   assert.equal(resolverCancelled, true);
+  assert.equal(fetched, false);
+
+  await assert.rejects(
+    verify({
+      apiUrl: API_URL,
+      fetchImpl: async () => { fetched = true; },
+      lookupFactory: resolverFactory(async () => new Promise(() => {}), () => { throw new Error("cancel failed"); }),
+      randomUUID: () => IDEMPOTENCY_KEY,
+      timeoutMs: 10
+    }),
+    /DNS lookup timed out after 10ms/
+  );
   assert.equal(fetched, false);
 });
 
@@ -390,6 +505,14 @@ test("verifier rejects malformed bodies, transport failures, and unsafe runtime 
     {
       fetchImpl: async () => { throw new Error("transport-secret"); },
       expected: /health request failed/
+    },
+    {
+      fetchImpl: async () => new Response(new ReadableStream({
+        start(controller) { controller.error(new Error("stream-secret")); }
+      }), {
+        headers: { "cache-control": "no-store", "content-type": "application/json" }
+      }),
+      expected: /health response body could not be read/
     }
   ];
   for (const { fetchImpl, expected } of cases) {
@@ -405,6 +528,24 @@ test("verifier rejects malformed bodies, transport failures, and unsafe runtime 
   );
   await assert.rejects(
     verify({ apiUrl: API_URL, fetchImpl: async () => jsonResponse({ ok: true }), lookupFactory: null }),
+    /DNS lookup is unavailable/
+  );
+  await assert.rejects(
+    verify({
+      apiUrl: API_URL,
+      fetchImpl: async () => jsonResponse({ ok: true }),
+      lookupFactory: () => { throw new Error("factory-secret"); },
+      randomUUID: () => IDEMPOTENCY_KEY
+    }),
+    /DNS lookup is unavailable/
+  );
+  await assert.rejects(
+    verify({
+      apiUrl: API_URL,
+      fetchImpl: async () => jsonResponse({ ok: true }),
+      lookupFactory: () => ({ lookup: null, cancel() {} }),
+      randomUUID: () => IDEMPOTENCY_KEY
+    }),
     /DNS lookup is unavailable/
   );
   await assert.rejects(
@@ -424,13 +565,28 @@ test("verifier rejects malformed bodies, transport failures, and unsafe runtime 
     }),
     /configuration response contract is invalid/
   );
+  await assert.rejects(
+    verify({
+      apiUrl: API_URL,
+      fetchImpl: async () => jsonResponse({ ok: true }),
+      randomUUID: () => IDEMPOTENCY_KEY,
+      maxResponseBytes: 0
+    }),
+    /configuration response contract is invalid/
+  );
 });
 
 test("verifier rejects a malformed nearby envelope", async () => {
+  let publishes = 0;
   const fetchImpl = async (url, init) => {
     const path = new URL(url).pathname;
     if (path === "/health") return jsonResponse({ ok: true });
-    if (init.method === "POST") return jsonResponse(record, { status: 201 });
+    if (init.method === "POST") {
+      const body = JSON.parse(init.body);
+      if (body.name !== "Sydney verifier route") return jsonResponse({ error: "idempotency_conflict" }, { status: 409 });
+      publishes += 1;
+      return jsonResponse(record, { status: publishes === 1 ? 201 : 200 });
+    }
     return jsonResponse({ segments: "not-an-array" });
   };
   await assert.rejects(
@@ -468,7 +624,7 @@ test("CLI reports only public status evidence and never request material", async
     uuid: () => IDEMPOTENCY_KEY
   });
   assert.equal(exitCode, 0);
-  assert.equal(stdout, "LIVE_API_OK health=200 publish=201 nearby=200\n");
+  assert.equal(stdout, "LIVE_API_OK health=200 publish=201 replay=200 conflict=409 nearby=200\n");
   assert.equal(stderr, "");
   for (const hidden of [API_URL, IDEMPOTENCY_KEY, SEGMENT_ID]) assert.equal(stdout.includes(hidden), false);
 });

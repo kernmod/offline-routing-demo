@@ -1,6 +1,6 @@
 {
-  "schema_version": 1,
-  "id": "sydney-cbd-walking-v1",
+  "schema_version": 2,
+  "id": "sydney-cbd-walking-v2",
   "bbox": [
     151.204,
     -33.873,
@@ -23,7 +23,20 @@
     "path": "routing.pack",
     "source": "graph.json",
     "builder_contract": "cch-routing-lite build-pack",
+    "pack_schema": "CCHP2",
     "command": "cargo run --release -p cch-routing-lite --bin build-pack -- fixtures/sydney/graph.json fixtures/sydney/routing.pack"
+  },
+  "elevation": {
+    "provider": "Mapzen / Tilezen Terrain Tiles on AWS Open Data",
+    "encoding": "terrarium",
+    "zoom": 15,
+    "attribution": "Terrain data processed by Mapzen/Tilezen; Australia terrain data © Commonwealth of Australia (Geoscience Australia) 2017",
+    "license": "CC-BY-4.0",
+    "license_url": "https://creativecommons.org/licenses/by/4.0/",
+    "vertical_datum": "upstream-source-dependent; not normalized for survey use",
+    "covered_nodes": 7023,
+    "min_m": 4,
+    "max_m": 112
   },
   "budget": {
     "max_bytes": 5000000
@@ -36,8 +49,8 @@
     },
     {
       "path": "graph.json",
-      "bytes": 840023,
-      "sha256": "e803cb53fec5efed5e54d39d8401ff01d86b28bc52878180ffb19d7a4e55a287"
+      "bytes": 952351,
+      "sha256": "ac75a52d1368602c8fe828e9c2b891d1097f638c4a92f4dcfe055afb90a882cc"
     },
     {
       "path": "map.pmtiles",
@@ -56,13 +69,48 @@
     },
     {
       "path": "ATTRIBUTION.md",
-      "bytes": 760,
-      "sha256": "5578d5f9ec25ec27ba2659a5d333595cb898a42307d0028ced79402822d6c5da"
+      "bytes": 1946,
+      "sha256": "a326b2e2fcf4c51e8a3fe4fe13431319ca65ed342867fd526dca8de897c8acf6"
+    },
+    {
+      "path": "dem/source.json",
+      "bytes": 2915,
+      "sha256": "2e48c3472a433f71c51a8d685fdbf59bfdb3d809d3c6d3b06deacd6b6c840a5c"
+    },
+    {
+      "path": "dem/tiles/15-30146-19663.png",
+      "bytes": 65281,
+      "sha256": "7017df895ceda7d2d4ca2865dc5b6ec5e5a07d22105ee50c62944b192039a7df"
+    },
+    {
+      "path": "dem/tiles/15-30146-19664.png",
+      "bytes": 75640,
+      "sha256": "b21df2375e4bd108ac378fbbba28c8b0bc8e24559dd5439946289473645e5b61"
+    },
+    {
+      "path": "dem/tiles/15-30147-19663.png",
+      "bytes": 90457,
+      "sha256": "10ae58bfdae71690f05e234ce8be3e46ab7c84f9527a70e74798ac57cfafc58e"
+    },
+    {
+      "path": "dem/tiles/15-30147-19664.png",
+      "bytes": 85202,
+      "sha256": "898794aa7e4df938941e181ffe34daf466f07e9ebe846e73dd9c10d6cfe5d2dc"
+    },
+    {
+      "path": "dem/tiles/15-30148-19663.png",
+      "bytes": 66780,
+      "sha256": "a112e29ed5654d604c50bcdc40fe4f7a2ec96f57704c014d83230a444bef38a5"
+    },
+    {
+      "path": "dem/tiles/15-30148-19664.png",
+      "bytes": 70735,
+      "sha256": "5f9e20beeed9e3912eb66b942f00067edfa857d40b3d22e6dfe40941cb74b65b"
     },
     {
       "path": "routing.pack",
-      "bytes": 1124780,
-      "sha256": "f76d7fb4f9323db1eeb2f6cebe575c8ca3fda94c04e07d45b434f8adb6907088"
+      "bytes": 1135727,
+      "sha256": "18cf63b62f29db48a760c4fb85b38a00d146f2441c2213868647a9c673bfbc95"
     }
   ]
 }

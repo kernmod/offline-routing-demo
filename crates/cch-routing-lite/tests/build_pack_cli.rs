@@ -1,12 +1,12 @@
 use std::process::Command;
 
-use cch_routing_lite::{Coordinate, GraphInput, PackArc, Router};
+use cch_routing_lite::{GraphInput, GraphNode, PackArc, Router};
 
 fn fixture() -> GraphInput {
     GraphInput {
         nodes: vec![
-            Coordinate::new(-33.87, 151.20),
-            Coordinate::new(-33.8701, 151.2001),
+            GraphNode::new(-33.87, 151.20, 12),
+            GraphNode::new(-33.8701, 151.2001, 18),
         ],
         arcs: vec![PackArc::new(0, 1, 42), PackArc::new(1, 0, 43)],
     }

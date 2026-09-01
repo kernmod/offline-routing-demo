@@ -9,7 +9,12 @@ import { decodePolyline6 } from "@offline-routing/shared";
 import { createSqliteD1 } from "./support/sqlite-d1.ts";
 
 const apiRoot = resolve(import.meta.dirname, "..");
-const migrations = ["0001_init.sql", "0002_seed_segments.sql"];
+const migrations = [
+  "0001_init.sql",
+  "0002_seed_segments.sql",
+  "0003_published_segments_v2.sql",
+  "0004_expand_published_geometry.sql"
+];
 const NOW = () => new Date("2026-08-31T12:34:56.789Z");
 const UUID_A = "018f9be5-4370-4a48-9f64-571f55555555";
 
@@ -82,6 +87,39 @@ const SYDNEY_LINE = [
   { lat: -33.8695, lng: 151.2102 },
   { lat: -33.8701, lng: 151.2111 }
 ];
+
+const SYDNEY_LINE_V2 = [
+  { lat: -33.86880004, lng: 151.20930004, elevationM: 10.04 },
+  { lat: -33.86950004, lng: 151.21020004, elevationM: 15.04 },
+  { lat: -33.87010004, lng: 151.21110004, elevationM: 12.04 }
+];
+
+function publishV2(
+  body: unknown,
+  idempotencyKey: string | null = UUID_A,
+  origin?: string,
+  clientIp: string | null = "198.51.100.100"
+): Request {
+  return request("/v2/segments", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      ...(idempotencyKey ? { "idempotency-key": idempotencyKey } : {}),
+      ...(origin ? { origin } : {}),
+      ...(clientIp ? { "cf-connecting-ip": clientIp } : {})
+    },
+    body: JSON.stringify(body)
+  }, clientIp);
+}
+
+function validV2Body(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    name: "  Cafe\u0301 harbour loop  ",
+    geometry: SYDNEY_LINE_V2,
+    controlPoints: [0, 2],
+    ...overrides
+  };
+}
 
 test("the TypeScript Worker exports a Cloudflare fetch entry point and rate limiter", () => {
   assert.equal(typeof worker.fetch, "function");
@@ -397,5 +435,250 @@ test("POST returns the existing row when an idempotent write races after the row
     assert.equal(count?.count, 1);
   } finally {
     context.cleanup();
+  }
+});
+
+test("v2 POST canonicalizes a complete publication and recomputes every derived field", async () => {
+  const context = createEnv();
+  try {
+    const response = await createWorker({ now: NOW }).fetch(publishV2(validV2Body()), context.env);
+    assert.equal(response.status, 201);
+    const payload = await response.json() as Record<string, unknown>;
+    assert.deepEqual(Object.keys(payload).sort(), [
+      "bbox", "controlPoints", "createdAt", "distanceM", "elevationGainM", "elevationLossM",
+      "elevationsM", "encodedGeometry", "expiresAt", "id", "isSeed", "metricsVersion", "name",
+      "pointCount", "publicationState"
+    ].sort());
+    assert.equal(payload.name, "Café harbour loop");
+    assert.equal(payload.publicationState, "published");
+    assert.equal(payload.metricsVersion, 2);
+    assert.deepEqual(payload.controlPoints, [0, 2]);
+    assert.deepEqual(payload.elevationsM, [10, 15, 12]);
+    assert.equal(payload.elevationGainM, 5);
+    assert.equal(payload.elevationLossM, 3);
+    assert.equal(payload.pointCount, 3);
+    assert.equal(payload.distanceM, 221);
+    assert.deepEqual(decodePolyline6(String(payload.encodedGeometry)), SYDNEY_LINE);
+    assert.deepEqual(payload.bbox, {
+      minLat: -33.8701,
+      minLng: 151.2093,
+      maxLat: -33.8688,
+      maxLng: 151.2111
+    });
+
+    const row = await context.env.DB.prepare(
+      "SELECT name, publication_state, elevations_json, control_points_json, elevation_gain_m, elevation_loss_m, metrics_version, idempotency_key_hash, idempotency_body_hash FROM segments WHERE metrics_version = 2"
+    ).first<Record<string, unknown>>();
+    assert.deepEqual(row, {
+      name: "Café harbour loop",
+      publication_state: "published",
+      elevations_json: "[10,15,12]",
+      control_points_json: "[0,2]",
+      elevation_gain_m: 5,
+      elevation_loss_m: 3,
+      metrics_version: 2,
+      idempotency_key_hash: row?.idempotency_key_hash,
+      idempotency_body_hash: row?.idempotency_body_hash
+    });
+    assert.equal(typeof row?.idempotency_key_hash, "string");
+    assert.equal(typeof row?.idempotency_body_hash, "string");
+    assert.notEqual(row?.idempotency_key_hash, UUID_A);
+  } finally {
+    context.cleanup();
+  }
+});
+
+test("v2 accepts a routed fixture geometry longer than the legacy 128-point envelope", async () => {
+  const context = createEnv();
+  try {
+    const geometry = Array.from({ length: 207 }, (_, index) => ({
+      lat: -33.8702 + index * 0.000001,
+      lng: 151.209 + index * 0.000001,
+      elevationM: 20 + (index % 5)
+    }));
+    const response = await createWorker({ now: NOW }).fetch(
+      publishV2(validV2Body({ geometry, controlPoints: [0, geometry.length - 1] })),
+      context.env
+    );
+
+    assert.equal(response.status, 201);
+    assert.equal((await response.json() as { pointCount: number }).pointCount, 207);
+
+    const oversized = Array.from({ length: 4_097 }, (_, index) => ({
+      lat: -33.8702 + index * 0.0000001,
+      lng: 151.209 + index * 0.0000001,
+      elevationM: 20
+    }));
+    const rejected = await createWorker({ now: NOW }).fetch(
+      publishV2(validV2Body({ geometry: oversized, controlPoints: [0, oversized.length - 1] })),
+      context.env
+    );
+    assert.equal(rejected.status, 413);
+  } finally {
+    context.cleanup();
+  }
+});
+
+test("v2 POST requires UUIDv4 idempotency and distinguishes replay from payload conflict", async () => {
+  const context = createEnv();
+  try {
+    const app = createWorker({ now: NOW });
+    const missing = await app.fetch(publishV2(validV2Body(), null), context.env);
+    const malformed = await app.fetch(publishV2(validV2Body(), "not-a-uuid"), context.env);
+    assert.deepEqual([missing.status, malformed.status], [400, 400]);
+
+    const first = await app.fetch(publishV2(validV2Body()), context.env);
+    const replay = await app.fetch(publishV2(validV2Body({
+      name: "Café harbour loop",
+      geometry: SYDNEY_LINE
+        .map((point, index) => ({ ...point, elevationM: [10, 15, 12][index] }))
+    })), context.env);
+    const conflict = await app.fetch(publishV2(validV2Body({ name: "Different route" })), context.env);
+    assert.deepEqual([first.status, replay.status, conflict.status], [201, 200, 409]);
+    assert.equal((await first.clone().json() as { id: string }).id, (await replay.json() as { id: string }).id);
+    assert.deepEqual(await conflict.json(), { error: "idempotency_conflict" });
+  } finally {
+    context.cleanup();
+  }
+});
+
+test("v2 concurrent replay stores exactly one published record", async () => {
+  const context = createEnv();
+  try {
+    const app = createWorker({ now: NOW });
+    const [first, second] = await Promise.all([
+      app.fetch(publishV2(validV2Body()), context.env),
+      app.fetch(publishV2(validV2Body()), context.env)
+    ]);
+    assert.deepEqual([first.status, second.status].sort(), [200, 201]);
+    assert.equal((await first.json() as { id: string }).id, (await second.json() as { id: string }).id);
+    const count = await context.env.DB.prepare("SELECT COUNT(*) AS count FROM segments WHERE metrics_version = 2").first<{ count: number }>();
+    assert.equal(count?.count, 1);
+  } finally {
+    context.cleanup();
+  }
+});
+
+test("v2 rejects drafts, client totals, unsafe names, malformed profiles, and invalid controls", async () => {
+  const context = createEnv();
+  try {
+    const app = createWorker({ now: NOW });
+    const invalidBodies: unknown[] = [
+      { geometry: SYDNEY_LINE_V2, controlPoints: [0, 2] },
+      validV2Body({ status: "draft" }),
+      validV2Body({ distanceM: 1 }),
+      validV2Body({ createdAt: "2020-01-01T00:00:00.000Z" }),
+      validV2Body({ name: "   " }),
+      validV2Body({ name: "line\nfeed" }),
+      validV2Body({ name: "unsafe\u202Ename" }),
+      validV2Body({ name: "x".repeat(81) }),
+      validV2Body({ geometry: SYDNEY_LINE }),
+      validV2Body({ geometry: SYDNEY_LINE_V2.map((point, index) => index ? point : { ...point, lat: 99 }) }),
+      validV2Body({ geometry: SYDNEY_LINE_V2.map((point, index) => index ? point : { ...point, extra: true }) }),
+      validV2Body({ geometry: SYDNEY_LINE_V2.map((point, index) => index ? point : { ...point, elevationM: Infinity }) }),
+      validV2Body({ geometry: SYDNEY_LINE_V2.map((point, index) => index ? point : { ...point, elevationM: 10_000 }) }),
+      validV2Body({ geometry: [SYDNEY_LINE_V2[0], SYDNEY_LINE_V2[0]] }),
+      validV2Body({ controlPoints: [0] }),
+      validV2Body({ controlPoints: [0, 0, 2] }),
+      validV2Body({ controlPoints: [1, 2] }),
+      validV2Body({ controlPoints: [0, 1] }),
+      validV2Body({ controlPoints: [0, 3] }),
+      validV2Body({ controlPoints: [0, 1.5, 2] })
+    ];
+    for (const [index, body] of invalidBodies.entries()) {
+      const key = `018f9be5-4370-4a48-9f64-${String(index + 100).padStart(12, "0")}`;
+      const result = await app.fetch(publishV2(body, key), context.env);
+      assert.equal([400, 413].includes(result.status), true, `case ${index}: ${JSON.stringify(await result.json())}`);
+    }
+    const count = await context.env.DB.prepare("SELECT COUNT(*) AS count FROM segments WHERE metrics_version = 2").first<{ count: number }>();
+    assert.equal(count?.count, 0);
+  } finally {
+    context.cleanup();
+  }
+});
+
+test("v2 GET returns published v2 and compatible legacy rows only through the indexed cell query", async () => {
+  const context = createEnv();
+  try {
+    const app = createWorker({ now: NOW });
+    const created = await app.fetch(publishV2(validV2Body()), context.env);
+    assert.equal(created.status, 201);
+    const nearby = await app.fetch(request("/v2/segments?bbox=-33.871,151.208,-33.868,151.212"), context.env);
+    assert.equal(nearby.status, 200);
+    const payload = await nearby.json() as { segments: Array<Record<string, unknown>> };
+    const legacy = payload.segments.find((segment) => segment.metricsVersion === 1);
+    const current = payload.segments.find((segment) => segment.metricsVersion === 2);
+    assert.ok(legacy);
+    assert.equal(legacy.publicationState, "published");
+    assert.equal(legacy.elevationsM, null);
+    assert.equal(legacy.elevationGainM, null);
+    assert.equal(legacy.elevationLossM, null);
+    assert.deepEqual(legacy.controlPoints, [0, 1]);
+    assert.ok(current);
+    assert.equal(current.name, "Café harbour loop");
+  } finally {
+    context.cleanup();
+  }
+});
+
+test("v2 preserves CORS, rate-limit, TTL, and generic-error boundaries", async () => {
+  const limited = createEnv({ RATE_LIMITER: new SharedRateLimitBinding(1).asBinding() });
+  const expired = createEnv();
+  try {
+    const app = createWorker({ now: NOW });
+    const first = await app.fetch(publishV2(validV2Body(), UUID_A, "https://viewer.example", "198.51.100.8"), limited.env);
+    const second = await app.fetch(publishV2(validV2Body(), "018f9be5-4370-4a48-9f64-571f55555556", "https://viewer.example", "198.51.100.8"), limited.env);
+    assert.deepEqual([first.status, second.status], [201, 429]);
+    assert.equal(first.headers.get("access-control-allow-origin"), "https://viewer.example");
+
+    await app.fetch(publishV2(validV2Body()), expired.env);
+    await expired.env.DB.prepare("UPDATE segments SET expires_at = '2026-08-31T12:00:00.000Z' WHERE metrics_version = 2").run();
+    const nearby = await app.fetch(request("/v2/segments?bbox=-33.871,151.208,-33.868,151.212"), expired.env);
+    const listed = await nearby.json() as { segments: Array<{ metricsVersion: number }> };
+    assert.equal(listed.segments.some((segment) => segment.metricsVersion === 2), false);
+
+    const broken = { ...expired.env, DB: { prepare() { throw new Error("private detail"); } } } as unknown as Env;
+    const failure = await app.fetch(publishV2(validV2Body()), broken);
+    assert.equal(failure.status, 500);
+    assert.deepEqual(await failure.json(), { error: "internal_error" });
+  } finally {
+    limited.cleanup();
+    expired.cleanup();
+  }
+});
+
+test("v2 resolves post-commit retries and keeps write failures generic", async () => {
+  const retry = createEnv();
+  const conflict = createEnv();
+  const failed = createEnv();
+  try {
+    const app = createWorker({ now: NOW });
+    for (const [context, mode, expectedStatus] of [
+      [retry, "retry", 200],
+      [conflict, "conflict", 409],
+      [failed, "failed", 500]
+    ] as const) {
+      const originalBatch = context.env.DB.batch.bind(context.env.DB);
+      let calls = 0;
+      context.env.DB.batch = async (statements) => {
+        calls += 1;
+        if (calls !== 2) return originalBatch(statements);
+        if (mode === "failed") throw new Error("simulated pre-commit failure");
+        await originalBatch(statements);
+        if (mode === "conflict") {
+          await context.env.DB.prepare("UPDATE segments SET idempotency_body_hash = ? WHERE metrics_version = 2")
+            .bind("0".repeat(64)).run();
+        }
+        throw new Error("simulated D1 retry after commit");
+      };
+      const result = await app.fetch(publishV2(validV2Body()), context.env);
+      assert.equal(result.status, expectedStatus);
+      if (expectedStatus === 409) assert.deepEqual(await result.json(), { error: "idempotency_conflict" });
+      if (expectedStatus === 500) assert.deepEqual(await result.json(), { error: "internal_error" });
+    }
+  } finally {
+    retry.cleanup();
+    conflict.cleanup();
+    failed.cleanup();
   }
 });

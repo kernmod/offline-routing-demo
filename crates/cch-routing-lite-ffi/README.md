@@ -4,7 +4,9 @@ This crate exposes the immutable offline router through a small C ABI suitable
 for a Nitro module:
 
 - `routing_router_load` validates a complete precomputed pack;
-- `routing_router_route` returns owned JSON `{total_weight, polyline}` bytes;
+- `routing_router_route` returns owned two-point route JSON bytes;
+- `routing_router_route_many` borrows an array of 2–16 ordered coordinates and
+  returns one owned aggregate JSON buffer, with optional loop closure;
 - `routing_router_benchmark` executes the fixed 1,024-request real routing
   corpus and reports raw latency quantiles plus pack-load time;
 - `routing_router_free` and `routing_buffer_free` are repeat-safe.

@@ -11,6 +11,7 @@ on:
       - "pnpm-workspace.yaml"
       - ".node-version"
       - "tools/deploy/**"
+      - "tools/live/**"
       - ".github/workflows/deploy-api.yml"
   workflow_dispatch:
 
@@ -72,3 +73,7 @@ jobs:
         if: always()
         run: |
           node --input-type=module -e 'import { rmSync } from "node:fs"; rmSync(process.env.RUNNER_TEMP + "/worker-secrets.json", { force: true });'
+      - name: Verify live v2 publish and read contract
+        env:
+          SEGMENTS_API_URL: ${{ vars.SEGMENTS_API_URL }}
+        run: pnpm verify:live-api --url "$SEGMENTS_API_URL"

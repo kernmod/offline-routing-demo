@@ -13,6 +13,7 @@ export type ViewerEvent =
   | { type: "tiles-error"; message: string }
   | { type: "data-ready"; segments: ApiSegment[] }
   | { type: "data-error"; message: string }
+  | { type: "published"; segment: ApiSegment }
   | { type: "select"; id: string };
 
 export function initialViewerState(): ViewerState {
@@ -35,6 +36,14 @@ export function nextViewerState(state: ViewerState, event: ViewerEvent): ViewerS
       };
     case "data-error":
       return { ...state, data: "error", segments: [], selectedId: null, message: event.message };
+    case "published":
+      return {
+        ...state,
+        data: "ready",
+        segments: [event.segment, ...state.segments.filter((segment) => segment.id !== event.segment.id)],
+        selectedId: event.segment.id,
+        message: null
+      };
     case "select":
       return state.segments.some((segment) => segment.id === event.id) ? { ...state, selectedId: event.id } : state;
   }

@@ -1,14 +1,14 @@
 use std::cmp::Ordering;
 
-use crate::Coordinate;
+use crate::GraphNode;
 
 /// Deterministic spatial nested-dissection-style ordering.
 ///
 /// Median separators are emitted after both partitions. CCH correctness does
 /// not depend on ordering quality, while the stable coordinate/id tie-breaks
 /// make public fixture builds byte reproducible.
-pub(crate) fn spatial_ordering(nodes: &[Coordinate]) -> Vec<u32> {
-    fn recurse(nodes: &[Coordinate], ids: &mut [u32], order: &mut Vec<u32>) {
+pub(crate) fn spatial_ordering(nodes: &[GraphNode]) -> Vec<u32> {
+    fn recurse(nodes: &[GraphNode], ids: &mut [u32], order: &mut Vec<u32>) {
         if ids.is_empty() {
             return;
         }

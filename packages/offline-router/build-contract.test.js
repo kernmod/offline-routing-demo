@@ -15,12 +15,17 @@ test("android packaging builds Rust shared objects into a generated build direct
   const kotlin = read("android/src/main/java/com/offlinerouter/OfflineRouterPackage.kt");
 
   assert.match(cmake, /build\/rustJniLibs\/\$\{ANDROID_ABI\}/);
+  assert.match(cmake, /generated-cmake/);
+  assert.match(cmake, /configure_file\(\.\.\/nitrogen\/generated\/android\/OfflineRouterOnLoad\.cpp/);
+  assert.match(cmake, /configure_file\(\.\.\/nitrogen\/generated\/shared\/c\+\+\/HybridOfflineRouterNativeSpec\.cpp/);
   assert.match(cmake, /IMPORTED_NO_SONAME TRUE/);
   assert.doesNotMatch(cmake, /src\/main\/jniLibs/);
   assert.match(gradle, /buildRustJniLibs/);
   assert.match(gradle, /reactNativeArchitectures/);
   assert.match(gradle, /abiFilters\.addAll\(selectedArchitectures\)/);
   assert.match(gradle, /preBuild\.dependsOn/);
+  assert.match(gradle, /buildCMakeRelWithDebInfo.*dependsOn\(tasks\.named\("buildRustJniLibs"\)\)/s);
+  assert.match(gradle, /configureCMakeRelWithDebInfo.*dependsOn\(tasks\.named\("buildRustJniLibs"\)\)/s);
   assert.match(appGradle, /intermediates\/sourcemaps\/react\/release/);
   assert.match(appGradle, /generated\/sourcemaps\/react\/release/);
   assert.match(appGradle, /intermediates\/dex\/release\/mergeDexRelease/);
@@ -49,6 +54,22 @@ test("the C++ bridge consumes the checked C ABI and frees failure buffers", () =
   const bridge = read("cpp/HybridOfflineRouterNative.cpp");
 
   assert.match(header, /cch-routing-lite-ffi\/include\/cch_routing_lite\.h/);
-  assert.match(bridge, /if \(buffer\.ptr != nullptr\) routing_buffer_free\(&buffer\);/);
+  assert.match(bridge, /~RoutingBufferGuard\(\) \{ routing_buffer_free\(&buffer_\); \}/);
   assert.doesNotMatch(header, /struct RoutingCoordinate \{/);
+});
+
+test("Nitro exposes bounded multipoint routing through the owned C ABI", () => {
+  const spec = read("src/specs/offline-router.nitro.ts");
+  const header = read("cpp/HybridOfflineRouterNative.hpp");
+  const bridge = read("cpp/HybridOfflineRouterNative.cpp");
+  const cAbi = read("../../crates/cch-routing-lite-ffi/include/cch_routing_lite.h");
+
+  assert.match(spec, /routeMany\(controls: Coordinate\[\], closedLoop: boolean\): string/);
+  assert.match(header, /routeMany\(const std::vector<Coordinate>& controls, bool closedLoop\)/);
+  assert.match(bridge, /routing_router_route_many/);
+  assert.match(bridge, /controls\.size\(\) < 2 \|\| controls\.size\(\) > 16/);
+  assert.match(bridge, /RoutingBufferGuard/);
+  assert.match(cAbi, /const RoutingCoordinate \*controls_ptr/);
+  assert.match(cAbi, /size_t control_count/);
+  assert.match(cAbi, /bool closed_loop/);
 });

@@ -41,7 +41,7 @@ cd "$demo_root/apps/mobile/android"
 NODE_ENV=production ./gradlew --no-daemon --max-workers=1 "-PreactNativeArchitectures=$abis" clean assembleRelease --rerun-tasks
 apk_source="$demo_root/apps/mobile/android/app/build/outputs/apk/release/app-release.apk"
 mkdir -p "$release_dir"
-apk_target="$release_dir/offline-routing-demo-cchp1.apk"
+apk_target="$release_dir/offline-routing-demo-route-studio.apk"
 cp "$apk_source" "$apk_target"
 sha256sum "$apk_target" > "$apk_target.sha256"
 "$demo_root/scripts/device/clean-generated.sh"
