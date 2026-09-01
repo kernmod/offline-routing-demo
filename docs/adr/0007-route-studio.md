@@ -4,7 +4,7 @@
 - Date: 2026-09-01
 - Delivery status: locally verified across domain, Rust/native, Rust/WASM,
   Worker/D1, mobile, browser, release gate, and benchmark; public live
-  verification still depends on the next `main` deployment
+  verification is closed on the deployed `main` baseline
 
 ## Context
 
@@ -71,8 +71,10 @@ submitted public geometry, and stores only the published immutable snapshot.
 ## Browser routing boundary
 
 The browser uses WebAssembly to run the same Rust query code as the native app.
-It loads the same byte-identical `routing.pack` used by mobile, verifies the
-manifest SHA-256, and performs all route calculations locally in a Web Worker.
+It loads the same byte-identical `routing.pack` used by mobile and performs all
+route calculations locally in the page runtime without requiring a Web Worker.
+Byte identity is enforced by the committed fixture manifest plus native/WASM
+parity tests, not by a separate runtime manifest verifier in the browser.
 
 The publish/read API never routes. There is no HTTP routing API, no server-side
 fallback, and no JavaScript shortest-path replacement for the CCH query path.

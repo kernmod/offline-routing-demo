@@ -10,6 +10,9 @@ device evidence. They record two `adb input tap` gestures on the MapLibre
 map, a native route result of 392 m / 31 points, and the rendered counter
 `network attempts this session: 0`.
 
+Historical note: this evidence predates the Route Studio `CCHP2` release and is
+kept only as the earlier airplane-mode baseline.
+
 The route uses the bundled CCHP1 pack:
 
 ```text

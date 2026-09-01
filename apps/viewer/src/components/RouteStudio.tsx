@@ -376,7 +376,11 @@ export function RouteStudio({
           <SegmentList segments={segments} selectedId={selectedId} onSelect={onSelect} />
           {selectedPublic && (
             <section className="selection" aria-label="Selected segment">
+              <h3>{selectedPublic.name ?? selectedPublic.id}</h3>
               <dl>
+                {"publicationState" in selectedPublic && selectedPublic.publicationState && (
+                  <div><dt>status</dt><dd>{selectedPublic.publicationState}</dd></div>
+                )}
                 <div><dt>distance</dt><dd>{selectedPublic.distanceM} m</dd></div>
                 <div><dt>geometry</dt><dd>{selectedPublic.pointCount} points</dd></div>
                 <div><dt>origin</dt><dd>{selectedPublic.kind === "seed" ? "fixture seed" : "live API"}</dd></div>

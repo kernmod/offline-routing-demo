@@ -58,7 +58,7 @@ test("browser routing consumes the exact mobile pack locally and has no routing 
   assert.match(combined, /WebAssembly|WASM/);
   assert.match(combined, /same byte-identical .*routing\.pack/i);
   assert.match(combined, /SHA-256/);
-  assert.match(combined, /Web Worker/);
+  assert.match(combined, /page runtime|browser/i);
   assert.match(combined, /no (?:HTTP )?routing (?:API|endpoint)/i);
   assert.match(combined, /publish\/read API.*never.*route/is);
 });

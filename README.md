@@ -122,8 +122,8 @@ VITE_API_BASE_URL=http://127.0.0.1:8787 pnpm --filter @offline-routing/viewer de
 pnpm --filter @offline-routing/mobile build
 ```
 
-The browser viewer uses the same `routing.pack` as mobile. The E2E suite fails
-if a `/route` request appears on the network.
+The browser viewer uses the same `routing.pack` bytes as mobile. The E2E suite
+fails if a `/route` request appears on the network.
 
 ### Android release and device gate
 
