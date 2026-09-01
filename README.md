@@ -7,7 +7,10 @@ UI, API surface, and release pipelines were rebuilt for publication so the
 system can be inspected and run without private data, terminology, or
 infrastructure.
 
-[![Android Route Studio running locally in 3D while both elevation-cut handles are dragged](docs/media/offline-routing-demo.gif)](https://kernmod.github.io/offline-routing-demo/)
+[![Four map taps build a 3.3 km multipoint route locally and extend it immediately after each point](docs/media/offline-routing-demo.gif)](https://kernmod.github.io/offline-routing-demo/)
+
+_Four taps, three local recalculations, 3.3 km: every new leg appears directly
+from the on-device Rust engine._
 
 One Rust CCH router runs in three environments:
 
