@@ -115,7 +115,9 @@ pnpm audit:public
 `CCHP2` and the committed fixture manifest records provenance, sizes, checksums,
 DEM source licensing, and the routing-pack SHA-256. `make build`, CI, and Pages
 also regenerate the pinned Rust/WASM output with path remapping and fail if it
-differs from the committed browser module.
+differs from the committed browser module. The WASM build jobs run on pinned
+Ubuntu 22.04 builders as well: `zstd-sys` compiles native C, so the compiler
+image is part of the reproducible toolchain alongside Rust and wasm-bindgen.
 
 ### Local app and viewer
 
