@@ -29,7 +29,7 @@
   "devDependencies": {
     "c8": "10.1.3",
     "eas-cli": "23.2.0",
-    "tsx": "4.20.6"
+    "tsx": "4.23.13"
   },
   "pnpm": {
     "overrides": {
